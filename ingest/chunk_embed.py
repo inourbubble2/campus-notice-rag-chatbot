@@ -1,31 +1,31 @@
+import asyncio
 import logging
+from itertools import chain
 from typing import List, Dict
 
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from .preprocess import normalize_text, compose_text_with_ocr
+from .preprocess import get_text, get_text_with_ocr
 
-def build_documents(rows: List[Dict]) -> List[Document]:
-  docs: List[Document] = []
-  splitter = RecursiveCharacterTextSplitter(
-      chunk_size=800,
-      chunk_overlap=160,
-      separators=["\n\n", "\n", ".", "!", "?", " ", ""],
-  )
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=800,
+    chunk_overlap=160,
+    separators=["\n\n", "\n", ".", "!", "?", " ", ""],
+)
 
-  for row in rows:
-    body_text = compose_text_with_ocr(row["html"])
+async def _process_row(row: Dict) -> List[Document]:
+  try:
+    body_text = await get_text_with_ocr(row["html"])
     if not body_text:
       # fallback: 텍스트만이라도
-      body_text = normalize_text(row["html"])
+      body_text = get_text(row["html"])
 
     title = row["title"]
-    full_text = f"[{title} - {body_text}"
-    logging.debug(full_text[:100], '...')
-
+    full_text = title + ' ' + body_text
+    row_docs = []
     for i, chunk in enumerate(splitter.split_text(full_text)):
-      meta = {
+      metadata = {
         "title": row["title"],
         "board": row["board"],
         "author": row["author"],
@@ -37,5 +37,13 @@ def build_documents(rows: List[Dict]) -> List[Document]:
         "chunk_index": i,
         "announcement_id": int(row["id"]),
       }
-      docs.append(Document(page_content=chunk, metadata=meta))
-  return docs
+      row_docs.append(Document(page_content=chunk, metadata=metadata))
+    return row_docs
+  except Exception as e:
+    logging.error(f"Error processing announcement {row.get('id', 'unknown')}: {e}")
+    return []
+
+async def build_documents(rows: List[Dict]) -> List[Document]:
+  tasks = [_process_row(row) for row in rows]
+  results = await asyncio.gather(*tasks)
+  return list(chain.from_iterable(results))

@@ -3,7 +3,7 @@ POST http://localhost:8000/ingest
 Content-Type: application/json
 
 {
-  "ids": [685, 746, 1127]
+  "ids": [1069]
 }
 
 ### Test ingest by date range
@@ -12,5 +12,5 @@ Content-Type: application/json
 
 {
   "from_date": "2025-03-01",
-  "to_date": "2025-03-31"
+  "to_date": "2025-03-07"
 }

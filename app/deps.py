@@ -13,12 +13,15 @@ from functools import lru_cache
 from typing import Optional
 
 from dotenv import load_dotenv
+from openai import AsyncOpenAI
 from pydantic_settings import BaseSettings
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_postgres.vectorstores import PGVector
 from langchain_core.vectorstores import VectorStore
 from langchain_core.retrievers import BaseRetriever
@@ -30,6 +33,7 @@ load_dotenv()
 class Settings(BaseSettings):
   # API Keys
   openai_api_key: str
+  gemini_api_key: str
 
   # DB / Vector
   pg_conn: str
@@ -39,10 +43,13 @@ class Settings(BaseSettings):
   use_jsonb: bool = True
 
   # LLM
-  chat_model: str = "gpt-5-mini"        # 최종 응답 생성용
-  small_model: str = "gpt-5-mini"       # 가벼운 재작성/가드/검증용
+  chat_model: str = "gpt-4o-mini"        # 최종 응답 생성용
+  small_model: str = "gpt-4o-mini"       # 가벼운 재작성/가드/검증용
   temperature: float = 0.0
-  request_timeout: int = 60             # seconds
+  request_timeout: int = 60              # seconds
+
+  # OCR
+  ocr_timeout: float = 10.0
 
   # Retriever 기본값
   retriever_k: int = 6
@@ -61,6 +68,7 @@ def get_settings() -> Settings:
 
 # ---------- Database ----------
 _engine: Optional[Engine] = None
+_async_engine: Optional[AsyncEngine] = None
 
 def get_engine() -> Engine:
   """SQLAlchemy Engine (lazy singleton)."""
@@ -89,7 +97,7 @@ def get_embeddings() -> OpenAIEmbeddings:
 # ---------- VectorStore (PGVector) ----------
 _vectorstore: Optional[VectorStore] = None
 
-def get_vectorstore() -> VectorStore:
+def get_vectorstore() -> PGVector:
   """PGVector VectorStore. 필요 시 pgvector 확장을 생성(create_extension=True)."""
   global _vectorstore
   if _vectorstore is None:
@@ -97,10 +105,11 @@ def get_vectorstore() -> VectorStore:
     _vectorstore = PGVector(
         embeddings=get_embeddings(),
         connection=cfg.pg_conn,
+        async_mode=True,
         collection_name=cfg.collection_name,
         embedding_length=cfg.embed_dim,  # 인덱스 차원 명시
         use_jsonb=cfg.use_jsonb,
-        create_extension=True,           # pgvector 확장 자동 생성(권장)
+        create_extension=True,           # pgvector 확장 자동 생성
     )
   return _vectorstore
 
@@ -130,9 +139,23 @@ def get_retriever(k: Optional[int] = None,
   )
 
 
+# ---------- OpenAI Client ----------
+_openai_client: Optional[AsyncOpenAI] = None
+
+def get_openai_client() -> AsyncOpenAI:
+  """AsyncOpenAI 클라이언트 (싱글톤)."""
+  global _openai_client
+  if _openai_client is None:
+    from openai import AsyncOpenAI
+    cfg = get_settings()
+    _openai_client = AsyncOpenAI(api_key=cfg.openai_api_key)
+  return _openai_client
+
+
 # ---------- LLMs ----------
 _chat_llm: Optional[ChatOpenAI] = None
 _small_llm: Optional[ChatOpenAI] = None
+_gemini_llm: Optional[ChatGoogleGenerativeAI] = None
 
 def get_chat_llm() -> ChatOpenAI:
   """최종 답변 생성용 LLM."""
@@ -147,15 +170,15 @@ def get_chat_llm() -> ChatOpenAI:
     )
   return _chat_llm
 
-def get_small_llm() -> ChatOpenAI:
-  """가벼운 작업(가드레일/재작성/검증)용 LLM."""
-  global _small_llm
-  if _small_llm is None:
+def get_gemini_llm() -> ChatGoogleGenerativeAI:
+  """OCR 등 Vision 작업용 Gemini LLM."""
+  global _gemini_llm
+  if _gemini_llm is None:
     cfg = get_settings()
-    _small_llm = ChatOpenAI(
-        model=cfg.small_model,
+    _gemini_llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash-lite",
         temperature=0,
         timeout=cfg.request_timeout,
-        api_key=cfg.openai_api_key,
+        google_api_key=cfg.gemini_api_key,
     )
-  return _small_llm
+  return _gemini_llm

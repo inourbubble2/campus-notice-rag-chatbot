@@ -3,9 +3,8 @@ from bs4 import BeautifulSoup
 from .ocr import enhance_html_with_ocr
 
 __all__ = [
-  "html_to_text",
-  "normalize_text",
-  "compose_text_with_ocr",
+  "get_text",
+  "get_text_with_ocr",
 ]
 
 def _clean_text(s: str) -> str:
@@ -17,22 +16,20 @@ def _clean_text(s: str) -> str:
   return "\n".join(lines)
 
 def html_to_text(html: str) -> str:
-  """<br>/<p>/<div>만 개행으로, 나머지 태그는 제거하여 순수 텍스트화."""
+  """<br>/<p>/<div>만 개행으로, 나머지 태그는 제거."""
   soup = BeautifulSoup(html, "html.parser")
 
-  # 의미 있는 줄바꿈
   for tag in soup.find_all(["br", "p", "div"]):
     tag.replace_with("\n" + tag.get_text())
 
-  # script/style 제거
   for t in soup(["script", "style"]):
     t.decompose()
 
   text = soup.get_text()
   return _clean_text(text)
 
-def normalize_text(html: str) -> str:
-  """HTML을 텍스트로 변환하고 정규화합니다."""
+def get_text(html: str) -> str:
+  """HTML을 텍스트로 변환하고 정규화."""
   s = html_to_text(html)
 
   # 콜론 앞뒤 이상 개행 보정:  "행사명\n:\n" -> "행사명: "
@@ -46,12 +43,11 @@ def normalize_text(html: str) -> str:
   # 추가 규칙이 있으면 여기에 확장(날짜/학기 표준화 등)
   return _clean_text(s)
 
-def compose_text_with_ocr(html: str) -> str:
+async def get_text_with_ocr(html: str) -> str:
   """
   HTML 순수 텍스트 + (존재 시) 이미지 OCR 텍스트 결합.
-  ocr.py 의 enhance_html_with_ocr 를 사용.
   """
   base = html_to_text(html)
-  ocr_text = enhance_html_with_ocr(html)
+  ocr_text = await enhance_html_with_ocr(html)
   full = "\n".join([t for t in [base, ocr_text] if t])
-  return normalize_text(full)
+  return get_text(full)
