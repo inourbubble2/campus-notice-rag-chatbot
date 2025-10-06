@@ -10,3 +10,7 @@ class IngestByIdsRequest(BaseModel):
 class IngestByDateRangeRequest(BaseModel):
     from_date: str  # YYYY-MM-DD format
     to_date: str    # YYYY-MM-DD format
+
+
+class ChatRequest(BaseModel):
+    question: str

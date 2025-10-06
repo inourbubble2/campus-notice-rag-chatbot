@@ -11,6 +11,14 @@ POST http://localhost:8000/ingest/date-range
 Content-Type: application/json
 
 {
-  "from_date": "2025-03-01",
-  "to_date": "2025-03-07"
+  "from_date": "2025-04-16",
+  "to_date": "2025-04-30"
+}
+
+### Test chat
+POST http://localhost:8000/chat
+Content-Type: application/json
+
+{
+  "question": "학교에서 열리는 공모전 추천 좀"
 }

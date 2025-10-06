@@ -54,7 +54,7 @@ class Settings(BaseSettings):
   # Retriever 기본값
   retriever_k: int = 6
   retriever_fetch_k: int = 40
-  retriever_mmr: bool = True
+  retriever_mmr: bool = False
 
   class Config:
     env_file = ".env"
@@ -105,8 +105,8 @@ def get_vectorstore() -> PGVector:
     _vectorstore = PGVector(
         embeddings=get_embeddings(),
         connection=cfg.pg_conn,
-        async_mode=True,
         collection_name=cfg.collection_name,
+        async_mode=True,
         embedding_length=cfg.embed_dim,  # 인덱스 차원 명시
         use_jsonb=cfg.use_jsonb,
         create_extension=True,           # pgvector 확장 자동 생성
