@@ -6,7 +6,8 @@ from typing import List, Dict
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from .preprocess import get_text, get_text_with_ocr
+from .ocr import get_ocr_text
+from .preprocess import get_plain_text
 
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=800,
@@ -16,10 +17,9 @@ splitter = RecursiveCharacterTextSplitter(
 
 async def _process_row(row: Dict) -> List[Document]:
   try:
-    body_text = await get_text_with_ocr(row["html"])
-    if not body_text:
-      # fallback: 텍스트만이라도
-      body_text = get_text(row["html"])
+    cleaned_text = get_plain_text(row["html"])
+    ocr_text = await get_ocr_text(row["html"])
+    body_text = "\n".join([cleaned_text, ocr_text])
 
     title = row["title"]
     full_text = title + ' ' + body_text

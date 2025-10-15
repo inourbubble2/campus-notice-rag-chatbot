@@ -1,9 +1,8 @@
 import re
 import unicodedata
 from bs4 import BeautifulSoup
-from .ocr import enhance_html_with_ocr
 
-__all__ = ["get_text", "get_text_with_ocr"]
+__all__ = ["get_plain_text"]
 
 def _clean_text(s: str) -> str:
   """연속 개행/공백 압축 + trim."""
@@ -13,7 +12,7 @@ def _clean_text(s: str) -> str:
   lines = [line.strip() for line in s.splitlines() if line.strip()]
   return "\n".join(lines)
 
-def html_to_text(html: str) -> str:
+def _html_to_text(html: str) -> str:
   """
   <br>/<p>/<div>는 개행으로 치환, 나머지 태그는 제거.
   SmartEditor 특유의 제어문자·?·&nbsp;도 정제.
@@ -44,9 +43,9 @@ def html_to_text(html: str) -> str:
 
   return _clean_text(text)
 
-def get_text(html: str) -> str:
+def get_plain_text(html: str) -> str:
   """HTML → 텍스트 변환 + 구문 보정."""
-  s = html_to_text(html)
+  s = _html_to_text(html)
 
   # 콜론 앞뒤 이상 개행 보정: "행사명\n:\n" → "행사명: "
   s = re.sub(r"\n\s*:\s*\n", ": ", s)
@@ -57,12 +56,3 @@ def get_text(html: str) -> str:
   s = re.sub(r"(\w)\n(\w)", r"\1 \2", s)
 
   return _clean_text(s)
-
-async def get_text_with_ocr(html: str) -> str:
-  """
-  HTML 순수 텍스트 + (존재 시) 이미지 OCR 텍스트 결합.
-  """
-  base = html_to_text(html)
-  ocr_text = await enhance_html_with_ocr(html)
-  full = "\n".join([t for t in [base, ocr_text] if t])
-  return get_text(full)

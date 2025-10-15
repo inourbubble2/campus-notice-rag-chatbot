@@ -8,11 +8,11 @@ from bs4.element import Tag
 
 from services import extract_text_from_image
 
-__all__ = ["enhance_html_with_ocr"]
+__all__ = ["get_ocr_text"]
 
 
 
-async def enhance_html_with_ocr(html: str) -> str:
+async def get_ocr_text(html: str) -> str:
   soup = BeautifulSoup(html, "html.parser")
 
   # 기존 텍스트 추출 (img 태그 제외)
@@ -43,10 +43,7 @@ async def enhance_html_with_ocr(html: str) -> str:
     valid_ocr_results = []
 
   # 기존 텍스트 + OCR 결과 결합
-  result_parts = [original_text] if original_text else []
-  result_parts.extend(valid_ocr_results)
-
-  return "\n".join(result_parts)
+  return "\n".join(valid_ocr_results)
 
 async def _extract_text_from_image(img: Tag) -> str:
   """이미지 태그에서 OCR 텍스트를 추출."""
@@ -56,10 +53,10 @@ async def _extract_text_from_image(img: Tag) -> str:
 
   ocr_txt = await _ocr_image_from_url(src)
   if ocr_txt.strip():
-    return f"image: {src} - text:{ocr_txt}"
+    return ocr_txt
   else:
     logging.warning(f"OCR returned empty text for image: {src}")
-    return f"image: {src} - text:(empty)"
+    return f"[image:{src}-text:(empty)]"
 
 async def _ocr_image_from_url(url: str) -> str:
   from app.deps import get_settings
