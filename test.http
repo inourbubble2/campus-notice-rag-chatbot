@@ -15,6 +15,23 @@ Content-Type: application/json
   "to_date": "2025-04-30"
 }
 
+### Test parse by IDs
+POST http://localhost:8000/parse
+Content-Type: application/json
+
+{
+  "ids": [1069]
+}
+
+### Test parse by date range
+POST http://localhost:8000/parse/date-range
+Content-Type: application/json
+
+{
+  "from_date": "2025-03-01",
+  "to_date": "2025-03-07"
+}
+
 ### Test chat
 POST http://localhost:8000/chat
 Content-Type: application/json

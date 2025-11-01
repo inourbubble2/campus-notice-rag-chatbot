@@ -3,6 +3,7 @@ import logging
 
 from fastapi import FastAPI
 from ingest import ingest_by_ids, ingest_by_date_range
+from parse import process_announcements_by_ids, process_announcements_by_date_range
 from models import IngestByIdsRequest, IngestByDateRangeRequest, ChatRequest
 from chat.chat_graph import app as chat_graph_app
 
@@ -32,6 +33,64 @@ async def ingest_announcements_by_date(request: IngestByDateRangeRequest):
         response["message"] = f"Successfully ingested announcements from {request.from_date} to {request.to_date}"
         response["date_range"] = {"from_date": request.from_date, "to_date": request.to_date}
         return response
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+@app.post("/parse")
+async def parse_announcements(request: IngestByIdsRequest):
+    try:
+        results = await process_announcements_by_ids(request.ids)
+        return {
+            "message": f"Successfully parsed {len(results)} announcements",
+            "ids": request.ids,
+            "results": [
+                {
+                    "announcement_id": r.announcement_id,
+                    "title": r.title,
+                    "has_cleaned_text": bool(r.cleaned_text),
+                    "has_ocr_text": bool(r.ocr_text),
+                    "tags": r.tags,
+                    "target_departments": r.target_departments,
+                    "target_grades": r.target_grades,
+                    "application_period": {
+                        "start": r.application_period_start.isoformat() if r.application_period_start else None,
+                        "end": r.application_period_end.isoformat() if r.application_period_end else None,
+                    },
+                    "error": r.error_message,
+                }
+                for r in results
+            ],
+        }
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+@app.post("/parse/date-range")
+async def parse_announcements_by_date(request: IngestByDateRangeRequest):
+    try:
+        results = await process_announcements_by_date_range(request.from_date, request.to_date)
+        return {
+            "message": f"Successfully parsed {len(results)} announcements from {request.from_date} to {request.to_date}",
+            "date_range": {"from_date": request.from_date, "to_date": request.to_date},
+            "results": [
+                {
+                    "announcement_id": r.announcement_id,
+                    "title": r.title,
+                    "has_cleaned_text": bool(r.cleaned_text),
+                    "has_ocr_text": bool(r.ocr_text),
+                    "tags": r.tags,
+                    "target_departments": r.target_departments,
+                    "target_grades": r.target_grades,
+                    "application_period": {
+                        "start": r.application_period_start.isoformat() if r.application_period_start else None,
+                        "end": r.application_period_end.isoformat() if r.application_period_end else None,
+                    },
+                    "error": r.error_message,
+                }
+                for r in results
+            ],
+        }
     except Exception as e:
         return {"error": str(e), "success": False}
 

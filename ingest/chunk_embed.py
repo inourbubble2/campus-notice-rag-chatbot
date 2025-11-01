@@ -6,8 +6,7 @@ from typing import List, Dict
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from .ocr import get_ocr_text
-from .preprocess import get_plain_text
+from services.html_processing_service import get_plain_text, get_ocr_text
 
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=800,

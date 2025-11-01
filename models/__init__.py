@@ -4,6 +4,9 @@ from .metrics import (
   OCRMetrics, OCRMetricsAggregator, get_ocr_metrics_aggregator,
   EmbeddingMetrics, IngestResult
 )
+from .announcement_parsed import (
+  AnnouncementParsed, AnnouncementParsedInfo
+)
 
 __all__ = [
     "IngestByIdsRequest",
@@ -14,4 +17,6 @@ __all__ = [
     "EmbeddingMetrics",
     "IngestResult",
     "ChatRequest",
+    "AnnouncementParsed",
+    "AnnouncementParsedInfo",
 ]
