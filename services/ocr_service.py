@@ -1,7 +1,15 @@
 import time
 import base64
+import asyncio
 import logging
 from langchain_core.messages import HumanMessage, SystemMessage
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log
+)
 from app.deps import get_gemini_llm
 from models.metrics import OCRMetrics, get_ocr_metrics_aggregator
 
@@ -22,6 +30,13 @@ user_prompt = """
 """
 
 
+@retry(
+    stop=stop_after_attempt(3),  # 최대 3회 시도
+    wait=wait_exponential(multiplier=1, min=2, max=10),  # 2초, 4초, 8초 대기
+    retry=retry_if_exception_type((TimeoutError, asyncio.TimeoutError, Exception)),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True
+)
 async def extract_text_from_image(img_base64: str) -> str:
     img_bytes = base64.b64decode(img_base64)
     image_size_kb = len(img_bytes) / 1024
@@ -45,7 +60,12 @@ async def extract_text_from_image(img_base64: str) -> str:
     logger.info(f"Gemini OCR 요청 시작 - 이미지 크기: {image_size_kb:.2f}KB")
 
     start_time = time.time()
-    response = await model.ainvoke([system_message, human_message])
+    try:
+        response = await model.ainvoke([system_message, human_message])
+    except Exception as e:
+        logger.error(f"OCR 요청 실패 - 이미지 크기: {image_size_kb:.2f}KB, 에러: {type(e).__name__}: {str(e)}")
+        raise
+
     end_time = time.time()
     duration_ms = (end_time - start_time) * 1000
 
@@ -71,4 +91,5 @@ async def extract_text_from_image(img_base64: str) -> str:
     aggregator = get_ocr_metrics_aggregator()
     aggregator.add_metrics(metrics)
 
+    logger.info(f"OCR 성공 - 이미지 크기: {image_size_kb:.2f}KB, 소요 시간: {duration_ms:.2f}ms")
     return result_text

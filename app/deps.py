@@ -8,7 +8,6 @@ FastAPI에서 재사용할 공용 의존성 모듈.
 모두 lazy singleton으로 초기화됩니다.
 """
 from __future__ import annotations
-import os
 from functools import lru_cache
 from typing import Optional
 
@@ -46,10 +45,10 @@ class Settings(BaseSettings):
   chat_model: str = "gpt-4o-mini"        # 최종 응답 생성용
   small_model: str = "gpt-4o-mini"       # 가벼운 재작성/가드/검증용
   temperature: float = 0.0
-  request_timeout: int = 60              # seconds
+  llm_timeout: int = 60              # seconds
 
   # OCR
-  ocr_timeout: float = 60.0
+  ocr_timeout: float = 120.0
 
   # Retriever 기본값
   retriever_k: int = 6
@@ -165,7 +164,7 @@ def get_chat_llm() -> ChatOpenAI:
     _chat_llm = ChatOpenAI(
         model=cfg.chat_model,
         temperature=cfg.temperature,
-        timeout=cfg.request_timeout,
+        timeout=cfg.llm_timeout,
         api_key=cfg.openai_api_key,
     )
   return _chat_llm
@@ -178,7 +177,7 @@ def get_gemini_llm() -> ChatGoogleGenerativeAI:
     _gemini_llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash-lite",
         temperature=0,
-        timeout=cfg.request_timeout,
+        timeout=cfg.ocr_timeout,
         google_api_key=cfg.gemini_api_key,
     )
   return _gemini_llm

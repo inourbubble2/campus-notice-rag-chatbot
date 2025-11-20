@@ -31,6 +31,9 @@ beautifulsoup4==4.13.5
 # HTTP Client
 aiohttp==3.11.16
 
+# Retry Logic
+tenacity==9.0.0
+
 # Environment
 python-dotenv==1.1.1
 bs4~=0.0.2
