@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import logging
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -84,13 +83,11 @@ class EmbeddingMetrics:
 class IngestResult:
     """Ingest 작업의 전체 결과."""
     embedding_metrics: EmbeddingMetrics
-    ocr_metrics: Dict[str, Any]
 
     def to_dict(self) -> Dict[str, Any]:
         """API 응답용 딕셔너리 변환."""
         return {
             "embedding_metrics": self.embedding_metrics.to_dict(),
-            "ocr_metrics": self.ocr_metrics,
         }
 
 # 전역 메트릭 집계기

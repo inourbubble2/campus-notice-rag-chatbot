@@ -6,7 +6,7 @@
 - chunk_embed: 문서 청킹 및 임베딩 준비
 """
 
-from .processor import ingest_by_ids, ingest_by_date_range
+from .ingest import ingest_by_ids, ingest_by_date_range
 
 __all__ = [
     "ingest_by_ids",

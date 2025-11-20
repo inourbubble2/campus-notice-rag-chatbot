@@ -1,5 +1,6 @@
 # chat_graph.py
 import json
+import logging
 from typing import TypedDict, List, Optional, Dict, Any
 
 from langchain_core.documents import Document
@@ -12,6 +13,8 @@ from app.deps import (
     get_retriever,
     get_chat_llm,
 )
+
+logger = logging.getLogger(__name__)
 
 # =========================
 # State
@@ -80,7 +83,8 @@ def guardrail_node(state: RAGState) -> RAGState:
         if pol not in ("PASS", "BLOCK"):
             pol = "PASS"
         state["guardrail"] = {"policy": pol, "reason": data.get("reason", "")}
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Guardrail JSON parse failed: {e}. LLM output: {out.content[:200]}")
         state["guardrail"] = {"policy": "PASS", "reason": ""}
     return state
 
@@ -123,11 +127,13 @@ def rewrite_node(state: RAGState) -> RAGState:
             data["query"] = state["question"]
         if not isinstance(data.get("keywords", []), list):
             data["keywords"] = []
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Rewrite JSON parse failed: {e}. LLM output: {out.content[:200]}")
         data = {"query": state["question"], "keywords": []}
     state["rewrite"] = data
     # 초기 시도 카운터
     state["attempt"] = state.get("attempt", 0) or 0
+    logger.info(f"Query rewritten: '{state['question']}' -> '{data.get('query')}' (keywords: {data.get('keywords')})")
     return state
 
 # =========================
@@ -142,7 +148,9 @@ async def retrieve_node(state: RAGState) -> RAGState:
     q = rw.get("query") or state["question"]
     # 시도 횟수에 따라 k 증가
     k = min(BASE_K + state.get("attempt", 0) * K_STEP, K_MAX)
+    logger.info(f"Retrieving documents: k={k}, attempt={state.get('attempt', 0)}")
     docs = await retriever_search(q, k=k)
+    logger.info(f"Retrieved {len(docs)} documents")
     state["docs"] = docs
     return state
 
@@ -174,10 +182,31 @@ def format_context(docs: List[Document]) -> str:
     lines = []
     for d in docs[:6]:
         md = d.metadata or {}
+
+        # 기본 정보
+        info_parts = [
+            f"게시판:{md.get('board', '미상')}",
+            f"학과:{md.get('major', '전체')}",
+            f"작성일:{md.get('written_at', '미상')}",
+            f"작성자:{md.get('author', '미상')}"
+        ]
+
+        # 구조화된 메타데이터 추가
+        tags = md.get('tags', [])
+        if tags:
+            info_parts.append(f"태그:{','.join(tags)}")
+
+        depts = md.get('target_departments', [])
+        if depts:
+            info_parts.append(f"대상학과:{','.join(depts)}")
+
+        grades = md.get('target_grades', [])
+        if grades:
+            info_parts.append(f"대상학년:{','.join(map(str, grades))}학년")
+
         lines.append(
-            f"- [{md.get('title','(제목없음)')}]"
-            f"(게시판:{md.get('board')}, 학과:{md.get('major')}, 작성일:{md.get('written_at')}), 작성자:{md.get('author')} \n"
-            f"  URL: {md.get('url')}\n"
+            f"- [{md.get('title','(제목없음)')}] ({', '.join(info_parts)})\n"
+            f"  URL: {md.get('url', '없음')}\n"
             f"  본문요약용청크: {d.page_content[:350]}..."
         )
     return "\n".join(lines)
@@ -261,18 +290,23 @@ def validate_node(state: RAGState) -> RAGState:
             decision = "PASS"
         critic = data.get("critic_query") or ""
         state["validate"] = {"decision": decision, "reason": data.get("reason",""), "critic_query": critic}
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Validate JSON parse failed: {e}. LLM output: {out.content[:200]}")
         state["validate"] = {"decision": "PASS", "reason": "", "critic_query": ""}
 
     # 만약 RETRY라면, critic_query로 rewrite를 살짝 보강
     if state["validate"]["decision"] == "RETRY":
+        logger.info(f"Validation failed, retrying: {state['validate'].get('reason')}")
         critic_q = state["validate"].get("critic_query") or ""
         if critic_q:
             # 기존 재작성 질의에 critic 힌트를 덧붙임
             rw = state.get("rewrite") or {"query": state["question"], "keywords": []}
             rw["query"] = f"{rw.get('query','')} | {critic_q}"
             state["rewrite"] = rw
+            logger.info(f"Critic query added: {critic_q}")
         state["attempt"] = state.get("attempt", 0) + 1
+    else:
+        logger.info("Validation passed")
 
     return state
 

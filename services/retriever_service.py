@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     async def main():
         # test
-        test_query = "랜선 야학"
+        test_query = "공결"
         print(f"Query: {test_query}\n")
 
         results = await retriever_search(query=test_query, k=5, fetch_k=20)
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         print(f"Found {len(results)} documents:\n")
         for i, doc in enumerate(results, 1):
             print(f"=== Document {i} ===")
-            # print(f"Content: {doc.page_content[:100]}...")
+            print(f"Content: {doc.page_content}...")
             print(f"Metadata: {doc.metadata}")
             print()
 

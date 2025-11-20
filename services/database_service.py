@@ -92,13 +92,41 @@ def upsert_processed_record(data: AnnouncementParsed) -> int:
         return result.scalar_one()
 
 
-def fetch_processed_records_by_ids(ids: List[int]) -> List[RowMapping]:
+def fetch_parsed_records_by_ids(ids: List[int]) -> List[RowMapping]:
     """ID 목록으로 중간 테이블 레코드들 조회 (announcement_id 기준)."""
     engine = get_engine()
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT * FROM public.announcement_parsed
-            WHERE announcement_id = ANY(:ids)
-            ORDER BY announcement_id
+            SELECT
+                ap.*,
+                a.board,
+                a.author,
+                a.major,
+                ad.url
+            FROM public.announcement_parsed ap
+            JOIN public.announcement a ON a.id = ap.announcement_id
+            JOIN public.announcement_detail ad ON ad.id = a.announcementdetail_id
+            WHERE ap.announcement_id = ANY(:ids)
+            ORDER BY ap.announcement_id
         """), {"ids": ids}).mappings().all()
+        return list(rows)
+
+
+def fetch_parsed_records_by_date_range(from_date: str, to_date: str) -> List[RowMapping]:
+    """날짜 범위로 중간 테이블 레코드들 조회 (written_at 기준)."""
+    engine = get_engine()
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT
+                ap.*,
+                a.board,
+                a.author,
+                a.major,
+                ad.url
+            FROM public.announcement_parsed ap
+            JOIN public.announcement a ON a.id = ap.announcement_id
+            JOIN public.announcement_detail ad ON ad.id = a.announcementdetail_id
+            WHERE ap.written_at >= :from_date AND ap.written_at <= :to_date
+            ORDER BY ap.written_at DESC
+        """), {"from_date": from_date, "to_date": to_date}).mappings().all()
         return list(rows)

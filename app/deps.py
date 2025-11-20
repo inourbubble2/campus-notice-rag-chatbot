@@ -49,7 +49,7 @@ class Settings(BaseSettings):
   request_timeout: int = 60              # seconds
 
   # OCR
-  ocr_timeout: float = 10.0
+  ocr_timeout: float = 60.0
 
   # Retriever 기본값
   retriever_k: int = 6

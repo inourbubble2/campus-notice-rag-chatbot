@@ -185,6 +185,10 @@ temp_*.jpeg
 # Database dumps
 *.sql
 *.db
+db/
+
+# Scripts
+scripts/
 
 # Logs
 logs/
