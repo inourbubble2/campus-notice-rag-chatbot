@@ -46,6 +46,7 @@ class Settings(BaseSettings):
   small_model: str = "gpt-4o-mini"       # 가벼운 재작성/가드/검증용
   temperature: float = 0.0
   llm_timeout: int = 60              # seconds
+  small_llm_timeout: int = 5
 
   # OCR
   ocr_timeout: float = 120.0
@@ -53,7 +54,8 @@ class Settings(BaseSettings):
   # Retriever 기본값
   retriever_k: int = 6
   retriever_fetch_k: int = 40
-  retriever_mmr: bool = False
+  retriever_mmr: bool = True  # MMR 활성화 (중복 제거)
+  retriever_lambda_mult: float = 0.5  # MMR lambda: 0=다양성 우선, 1=유사도 우선
 
   class Config:
     env_file = ".env"
@@ -168,6 +170,19 @@ def get_chat_llm() -> ChatOpenAI:
         api_key=cfg.openai_api_key,
     )
   return _chat_llm
+
+def get_small_llm() -> ChatOpenAI:
+  global _small_llm
+  if _small_llm is None:
+    cfg = get_settings()
+    _small_llm = ChatOpenAI(
+        model=cfg.small_model,
+        temperature=cfg.temperature,
+        timeout=cfg.small_llm_timeout,
+        api_key=cfg.openai_api_key,
+    )
+  return _small_llm
+
 
 def get_gemini_llm() -> ChatGoogleGenerativeAI:
   """OCR 등 Vision 작업용 Gemini LLM."""
