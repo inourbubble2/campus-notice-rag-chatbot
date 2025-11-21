@@ -54,7 +54,7 @@ class Settings(BaseSettings):
   # Retriever 기본값
   retriever_k: int = 6
   retriever_fetch_k: int = 40
-  retriever_mmr: bool = True  # MMR 활성화 (중복 제거)
+  retriever_mmr: bool = False  # MMR 활성화 (중복 제거)
   retriever_lambda_mult: float = 0.5  # MMR lambda: 0=다양성 우선, 1=유사도 우선
 
   class Config:

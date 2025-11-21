@@ -91,7 +91,13 @@ async def retriever_search(
     else:
         # 일반 유사도 검색
         logger.info(f"Using similarity search (k={search_k})")
-        docs = await vectorstore.asimilarity_search(query, k=search_k)
+        docs_with_score = await vectorstore.asimilarity_search_with_score(query, k=search_k)
+        docs = []
+        for doc, score in docs_with_score:
+            if doc.metadata is None:
+                doc.metadata = {}
+            doc.metadata["score"] = score
+            docs.append(doc)
 
     logger.info(f"Vector search returned {len(docs)} documents")
 
