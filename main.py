@@ -1,5 +1,7 @@
-import json
 import logging
+import json
+import time
+from datetime import datetime
 
 from fastapi import FastAPI
 from ingest import ingest_by_ids, ingest_by_date_range
@@ -98,6 +100,8 @@ async def parse_announcements_by_date(request: IngestByDateRangeRequest):
 @app.post("/chat")
 async def chat(request: ChatRequest):
     """RAG 기반 캠퍼스 공지사항 챗봇 API"""
+    start_time = time.time()
+
     result = await chat_graph_app.ainvoke(
         {
             "question": request.question,
@@ -111,21 +115,57 @@ async def chat(request: ChatRequest):
         config={"configurable": {"thread_id": request.conversation_id}},
     )
 
-    logger.info("=== Guardrail ===")
-    logger.info(json.dumps(result.get("guardrail", {}), ensure_ascii=False, indent=2))
-    logger.info("=== Rewritten ===")
-    logger.info(json.dumps(result.get("rewrite", {}), ensure_ascii=False, indent=2))
-    logger.info("=== Validate ===")
-    logger.info(json.dumps(result.get("validate", {}), ensure_ascii=False, indent=2))
-    logger.info("=== Answer ===")
-    logger.info(result.get("answer","(no answer)"))
+    end_time = time.time()
+    total_latency_ms = (end_time - start_time) * 1000
 
-    # guardrail 차단 체크
+    logger.info(f"Request {request.conversation_id} processed. Latency: {total_latency_ms:.2f}ms")
+
+    log_data = {
+        "metadata": {
+            "request_id": request.conversation_id,
+            "timestamp": datetime.now().isoformat(),
+            "embedding_model": "text-embedding-3-small",
+            "search_filters": result.get("rewrite", {}).get("filters", {})
+        },
+        "query": {
+            "raw": request.question,
+            "rewritten": result.get("rewrite", {}).get("query")
+        },
+        "retrieval": {
+            "results": [
+                {
+                    "doc_id": d.metadata.get("announcement_id"),
+                    "score": d.metadata.get("score"),
+                    "url": d.metadata.get("url"),
+                    "title": d.metadata.get("title")
+                } for d in result.get("docs", [])
+            ]
+        },
+        "context_used": [
+            {
+                "doc_id": d.metadata.get("announcement_id"),
+                "page_content": d.page_content
+            } for d in result.get("docs", [])
+        ],
+        "generation": {
+            "model": "gpt-4o-mini",
+            "first_token_latency_ms": None,
+            "total_latency_ms": round(total_latency_ms, 2),
+            "final_answer": result.get("answer")
+        }
+    }
+
+    with open("chat_logs.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
+
     if result.get("guardrail", {}).get("policy") == "BLOCK":
         logger.warning(f"Question blocked: {request.question}")
         return {
             "answer": "죄송합니다. 해당 질문은 대학 공지사항 관련 질문이 아니거나 부적절한 내용이 포함되어 있습니다.",
-            "blocked": True,
+            "contexts": []
         }
 
-    return {"answer": result.get("answer", "(답변 생성 실패)")}
+    return {
+        "answer": result.get("answer", ""),
+        "contexts": [d.page_content for d in result.get("docs", [])]
+    }

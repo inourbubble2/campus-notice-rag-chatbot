@@ -193,6 +193,7 @@ scripts/
 # Logs
 logs/
 *.log.*
+*.jsonl
 
 # AI Guide
 CLAUDE.md
