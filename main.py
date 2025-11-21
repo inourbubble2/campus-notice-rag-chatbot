@@ -101,7 +101,6 @@ async def chat(request: ChatRequest):
     result = await chat_graph_app.ainvoke(
         {
             "question": request.question,
-            "chat_history": [],
             "docs": [],
             "answer": None,
             "rewrite": None,
@@ -109,7 +108,7 @@ async def chat(request: ChatRequest):
             "validate": None,
             "guardrail": None,
         },
-        config={"configurable": {"thread_id": "default"}},
+        config={"configurable": {"thread_id": request.chat_id}},
     )
 
     logger.info("=== Guardrail ===")

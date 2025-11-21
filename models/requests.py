@@ -14,3 +14,4 @@ class IngestByDateRangeRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+    chat_id: str

@@ -31,7 +31,8 @@ class RAGState(TypedDict):
 # =========================
 GUARD_SYS = """당신은 대학 Q&A 서비스의 가드레일입니다.
 아래 기준으로만 JSON을 반환하세요.
-- 대학 공지/규칙/행사 등 대학과 관련 없는 내용, 개인식별정보 요구/제공, 법/의료/금융 고위험 조언, 혐오/폭력 조장, 성인물, 공격적/위법한 요청 → BLOCK
+- 대학 공지/규칙/행사 등 대학과 관련 없는 내용, 혐오/폭력 조장, 성인물, 공격적/위법한 요청 → BLOCK
+- 단, **이전 대화 맥락(Context)에서 이어지는 질문**이라면, 겉보기에 대학과 무관해 보여도 허용(PASS)하세요. (예: "그거 언제야?", "어디서 해?" 등)
 - 그 외 → PASS
 
 반환 스키마:
@@ -42,7 +43,12 @@ GUARD_SYS = """당신은 대학 Q&A 서비스의 가드레일입니다.
 설명 문장 없이 JSON만 출력하세요.
 """
 
-GUARD_USER_TMPL = """사용자 질문:
+GUARD_USER_TMPL = """대화 기록:
+{% for msg in chat_history[-6:] %}
+- {{ msg.role }}: {{ msg.content }}
+{% endfor %}
+
+사용자 질문:
 {{ question }}"""
 
 guard_prompt = ChatPromptTemplate.from_messages(
@@ -51,7 +57,10 @@ guard_prompt = ChatPromptTemplate.from_messages(
 )
 
 def guardrail_node(state: RAGState) -> RAGState:
-    msgs = guard_prompt.format_messages(question=state["question"])
+    msgs = guard_prompt.format_messages(
+        question=state["question"],
+        chat_history=state.get("chat_history", [])
+    )
     out = get_small_llm().invoke(msgs)
     try:
         data = json.loads(out.content)
@@ -83,7 +92,12 @@ JSON 한 객체만 출력하고 설명/문장/코드블록은 금지합니다.
 {% endraw %}
 """
 
-REWRITE_USER_TMPL = """원 질문:
+REWRITE_USER_TMPL = """대화 기록:
+{% for msg in chat_history[-6:] %}
+- {{ msg.role }}: {{ msg.content }}
+{% endfor %}
+
+원 질문:
 {{ question }}
 
 지침:
@@ -106,7 +120,10 @@ rewrite_prompt = ChatPromptTemplate.from_messages(
 )
 
 def rewrite_node(state: RAGState) -> RAGState:
-    msgs = rewrite_prompt.format_messages(question=state["question"])
+    msgs = rewrite_prompt.format_messages(
+        question=state["question"],
+        chat_history=state.get("chat_history", [])
+    )
     out = get_small_llm().invoke(msgs)
     try:
         data = json.loads(out.content.strip())
@@ -207,7 +224,10 @@ GEN_SYS = """당신은 서울시립대학교 공지사항 Q&A 도우미입니다
 - 공지의 문구를 그대로 복사하기보다 핵심만 요약하세요.
 """
 
-GEN_USER_TMPL = """질문: {question}
+GEN_USER_TMPL = """이전 대화:
+{chat_history}
+
+질문: {question}
 
 검색 질의(재작성): {rewritten_query}
 핵심 키워드: {keywords}
@@ -268,8 +288,13 @@ def generate_node(state: RAGState) -> RAGState:
         filter_parts.append(f"태그: {', '.join(filters['tags'])}")
     filter_str = ", ".join(filter_parts) if filter_parts else "없음"
 
+    # Chat history formatting
+    history = state.get("chat_history", [])
+    history_str = "\n".join([f"- {m['role']}: {m['content']}" for m in history[-6:]])
+
     msgs = gen_prompt.format_messages(
         question=state["question"],
+        chat_history=history_str,
         rewritten_query=rw.get("query") or state["question"],
         keywords=", ".join(rw.get("keywords", [])),
         filters=filter_str,
@@ -288,6 +313,14 @@ def generate_node(state: RAGState) -> RAGState:
         used.add(key)
         sources.append(f"- {m.get('announcement_id')} | {m.get('title')} | {m.get('board')} | {m.get('major')} | {m.get('author')} | {m.get('written_at')} | {m.get('url')}")
     state["answer"] = out.content
+    
+    # Update chat history
+    new_history = state.get("chat_history", []) + [
+        {"role": "user", "content": state["question"]},
+        {"role": "assistant", "content": out.content}
+    ]
+    state["chat_history"] = new_history
+    
     return state
 
 # =========================
