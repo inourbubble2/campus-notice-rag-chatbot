@@ -108,7 +108,7 @@ async def chat(request: ChatRequest):
             "validate": None,
             "guardrail": None,
         },
-        config={"configurable": {"thread_id": request.chat_id}},
+        config={"configurable": {"thread_id": request.conversation_id}},
     )
 
     logger.info("=== Guardrail ===")
