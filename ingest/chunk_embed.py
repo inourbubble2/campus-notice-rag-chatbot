@@ -6,7 +6,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=800,
-    chunk_overlap=160,
+    chunk_overlap=120,
     separators=["\n\n", "\n", ".", "!", "?", " ", ""],
 )
 
@@ -16,19 +16,15 @@ def _build_enhanced_text(row: Dict) -> str:
     announcement_parsed의 row로부터 텍스트 증강 (구조화 정보 포함)
     """
     parts = []
-
-    # 1. 제목
-    parts.append(f"제목: {row['title']}")
-
-    # 2. 본문 (cleaned_text)
+    # 1. 본문 (cleaned_text)
     if row.get('cleaned_text'):
         parts.append(row['cleaned_text'])
 
-    # 3. OCR 텍스트
+    # 2. OCR 텍스트
     if row.get('ocr_text'):
         parts.append(row['ocr_text'])
 
-    # 4. 구조화 정보를 자연어로 추가
+    # 3. 구조화 정보를 자연어로 추가
     if row.get('tags') and len(row['tags']) > 0:
         parts.append(f"관련 태그: {', '.join(row['tags'])}")
 
@@ -38,14 +34,6 @@ def _build_enhanced_text(row: Dict) -> str:
     if row.get('target_grades') and len(row['target_grades']) > 0:
         grades = ', '.join([f"{g}학년" for g in row['target_grades']])
         parts.append(f"대상 학년: {grades}")
-
-    if row.get('application_period_start'):
-        start_date = row['application_period_start']
-        parts.append(f"신청 시작일: {start_date}")
-
-    if row.get('application_period_end'):
-        end_date = row['application_period_end']
-        parts.append(f"신청 마감일: {end_date}")
 
     return "\n".join(parts)
 
@@ -63,6 +51,7 @@ def build_documents_from_parsed(parsed_rows: List[Dict]) -> List[Document]:
 
             for i, chunk_text in enumerate(text_chunks):
                 # 메타데이터 구성
+                page_content = row["title"] + "\n" + chunk_text
                 metadata = {
                     "announcement_id": row["announcement_id"],
                     "chunk_index": i,
@@ -83,7 +72,7 @@ def build_documents_from_parsed(parsed_rows: List[Dict]) -> List[Document]:
                     "application_period_end": row["application_period_end"].isoformat() if row.get("application_period_end") else None,
                 }
 
-                docs.append(Document(page_content=chunk_text, metadata=metadata))
+                docs.append(Document(page_content=page_content, metadata=metadata))
 
         except Exception as e:
             logging.error(f"Error processing announcement {row.get('announcement_id', 'unknown')}: {e}")
