@@ -11,6 +11,11 @@ K_MAX = 20
 async def retrieve_node(state: RAGState) -> RAGState:
     rw = state.get("rewrite") or {}
     q = rw.get("query") or state["question"]
+    keywords = rw.get("keywords", [])
+    
+    # 키워드를 쿼리 뒤에 붙여서 검색 강화
+    if keywords:
+        q = f"{q} {' '.join(keywords)}"
     filters = rw.get("filters", {})
 
     # 시도 횟수에 따라 k 증가

@@ -40,6 +40,13 @@ if "conversation_id" not in st.session_state:
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+        
+        # Display contexts if they exist in history
+        if message.get("contexts"):
+            with st.expander("📚 참고 문서 확인하기"):
+                for i, ctx in enumerate(message["contexts"], 1):
+                    st.markdown(f"**{i}.** {ctx}")
+                    st.divider()
 
 # Chat input
 if prompt := st.chat_input("질문을 입력해주세요..."):
@@ -75,7 +82,19 @@ if prompt := st.chat_input("질문을 입력해주세요..."):
 
                 message_placeholder.markdown(answer)
 
-                st.session_state.messages.append({"role": "assistant", "content": answer})
+                # Display contexts if available
+                contexts = data.get("contexts", [])
+                if contexts:
+                    with st.expander("📚 참고 문서 확인하기"):
+                        for i, ctx in enumerate(contexts, 1):
+                            st.markdown(f"**{i}.** {ctx}")
+                            st.divider()
+
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": answer,
+                    "contexts": contexts  # Save contexts to history
+                })
             else:
                 error_msg = f"서버 오류가 발생했습니다. (Status: {response.status_code})"
                 message_placeholder.error(error_msg)

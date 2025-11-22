@@ -125,7 +125,6 @@ async def chat(request: ChatRequest):
             "request_id": request.conversation_id,
             "timestamp": datetime.now().isoformat(),
             "embedding_model": "text-embedding-3-small",
-            "search_filters": result.get("rewrite", {}).get("filters", {})
         },
         "query": {
             "raw": request.question,
