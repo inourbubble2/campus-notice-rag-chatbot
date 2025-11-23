@@ -57,6 +57,9 @@ class Settings(BaseSettings):
   retriever_mmr: bool = False  # MMR 활성화 (중복 제거)
   retriever_lambda_mult: float = 0.5  # MMR lambda: 0=다양성 우선, 1=유사도 우선
 
+  # Reranker
+  reranker_model: str = "Dongjin-kr/ko-reranker"
+
   class Config:
     env_file = ".env"
 
@@ -196,3 +199,31 @@ def get_gemini_llm() -> ChatGoogleGenerativeAI:
         google_api_key=cfg.gemini_api_key,
     )
   return _gemini_llm
+
+
+# ---------- Reranker ----------
+_reranker = None
+
+def get_reranker():
+    """
+    CrossEncoder Reranker (lazy singleton).
+    Dongjin-kr/ko-reranker 로드.
+    """
+    global _reranker
+    if _reranker is None:
+        from sentence_transformers import CrossEncoder
+        cfg = get_settings()
+        # device 설정: mps(Mac), cuda(NVIDIA), cpu
+        import torch
+        device = "cpu"
+        if torch.backends.mps.is_available():
+            device = "mps"
+        elif torch.cuda.is_available():
+            device = "cuda"
+            
+        _reranker = CrossEncoder(
+            cfg.reranker_model,
+            automodel_args={"dtype": "auto"},
+            device=device
+        )
+    return _reranker

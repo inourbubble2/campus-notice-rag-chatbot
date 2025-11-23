@@ -12,69 +12,17 @@ from app.deps import get_settings, get_vectorstore
 logger = logging.getLogger(__name__)
 
 
-def _check_array_overlap(doc_array: List[Any], filter_values: List[Any]) -> bool:
-    """
-    배열 overlap 체크: 필터 값 중 하나라도 문서 배열에 포함되어 있으면 True
-
-    Args:
-        doc_array: 문서의 메타데이터 배열 (예: ["조경학과", "건축학과"])
-        filter_values: 필터링할 값들 (예: ["조경학과"])
-
-    Returns:
-        overlap 여부
-    """
-    if not doc_array or not filter_values:
-        return False
-
-    # 배열이 None이거나 빈 배열이면 False
-    doc_set = set(doc_array) if isinstance(doc_array, list) else set()
-    filter_set = set(filter_values)
-
-    return bool(doc_set & filter_set)  # 교집합이 있으면 True
-
-
 async def retriever_search(
     query: str,
     k: int,
     fetch_k: int = 40,
-    filters: Optional[Dict[str, Any]] = None
 ) -> List[Document]:
-    """
-    동적 k/fetch_k를 지원하는 검색 함수 with MMR 및 후처리 필터링.
-
-    MMR (Maximal Marginal Relevance):
-    - 유사도와 다양성을 동시에 고려
-    - 중복 문서 최소화
-
-    후처리 필터링:
-    - LangChain PGVector는 배열 필터를 지원하지 않으므로
-    - Python에서 정확하게 필터링
-
-    Args:
-        query: 검색 쿼리
-        k: 최종 반환할 문서 개수
-        fetch_k: MMR 전 후보 풀 크기
-        filters: 메타데이터 필터 (departments, grades, tags)
-
-    Returns:
-        검색된 Document 리스트
-    """
     cfg = get_settings()
     vectorstore = get_vectorstore()
 
-    # 필터가 있으면 더 많은 문서를 가져와서 후처리
-    has_filters = filters and any([
-        filters.get("departments"),
-        filters.get("grades"),
-        filters.get("tags")
-    ])
+    vectorstore = get_vectorstore()
 
-    if has_filters:
-        # 필터링 시 손실을 고려해서 3배 더 가져옴
-        search_k = k * 3
-        logger.info(f"Fetching {search_k} documents for post-filtering (target: {k})")
-    else:
-        search_k = k
+    search_k = k
 
     # MMR 검색
     if cfg.retriever_mmr:
@@ -101,69 +49,44 @@ async def retriever_search(
 
     logger.info(f"Vector search returned {len(docs)} documents")
 
-    # 후처리 필터링
-    if has_filters:
-        filtered_docs = []
-
-        for doc in docs:
-            md = doc.metadata or {}
-            matched = False
-
-            # departments 필터: target_departments 배열과 overlap 확인
-            if filters.get("departments"):
-                if _check_array_overlap(
-                    md.get("target_departments", []),
-                    filters["departments"]
-                ):
-                    matched = True
-
-            # grades 필터: target_grades 배열과 overlap 확인
-            if not matched and filters.get("grades"):
-                if _check_array_overlap(
-                    md.get("target_grades", []),
-                    filters["grades"]
-                ):
-                    matched = True
-
-            # tags 필터: tags 배열과 overlap 확인
-            if not matched and filters.get("tags"):
-                if _check_array_overlap(
-                    md.get("tags", []),
-                    filters["tags"]
-                ):
-                    matched = True
-
-            if matched:
-                filtered_docs.append(doc)
-
-        logger.info(f"Post-filtering: {len(docs)} → {len(filtered_docs)} documents")
-
-        # 필터링 결과가 충분하지 않으면 필터 없는 결과로 fallback
-        if len(filtered_docs) < k // 2:
-            logger.warning(f"Filtered results ({len(filtered_docs)}) below threshold ({k // 2}). Using unfiltered results.")
-            docs = docs[:k]
-        else:
-            # 필터링 후 k개만 반환
-            docs = filtered_docs[:k]
-
     return docs
 
 
-if __name__ == "__main__":
-    import asyncio
+def rerank_documents(query: str, docs: List[Document], top_n: int = 5) -> List[Document]:
+    """
+    CrossEncoder(Dongjin-kr/ko-reranker)를 사용하여 문서 리랭킹 수행.
+    """
+    if not docs:
+        return []
 
-    async def main():
-        # test
-        test_query = "조경학과"
-        print(f"Query: {test_query}\n")
-
-        results = await retriever_search(query=test_query, k=5, fetch_k=20)
-
-        print(f"Found {len(results)} documents:\n")
-        for i, doc in enumerate(results, 1):
-            print(f"=== Document {i} ===")
-            print(f"Content: {doc.page_content}...")
-            print(f"Metadata: {doc.metadata}")
-            print()
-
-    asyncio.run(main())
+    try:
+        from app.deps import get_reranker
+        
+        ranker = get_reranker()
+        
+        # (query, passage) 쌍 생성
+        pairs = [[query, doc.page_content] for doc in docs]
+        
+        # 점수 계산
+        scores = ranker.predict(pairs)
+        
+        # 점수와 함께 문서 저장
+        scored_docs = []
+        for doc, score in zip(docs, scores):
+            if doc.metadata is None:
+                doc.metadata = {}
+            doc.metadata["score"] = float(score)
+            scored_docs.append(doc)
+            
+        # 점수 내림차순 정렬
+        scored_docs.sort(key=lambda x: x.metadata["score"], reverse=True)
+        
+        # 상위 N개 반환
+        reranked_docs = scored_docs[:top_n]
+            
+        logger.info(f"Reranked {len(docs)} -> {len(reranked_docs)} documents (Top score: {reranked_docs[0].metadata['score']:.4f})")
+        return reranked_docs
+        
+    except Exception as e:
+        logger.error(f"Reranking failed: {e}")
+        return docs[:top_n]

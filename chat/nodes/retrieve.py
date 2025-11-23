@@ -1,12 +1,12 @@
 import logging
-from services.retriever_service import retriever_search
+from services.retriever_service import retriever_search, rerank_documents
 from chat.schema import RAGState
 
 logger = logging.getLogger(__name__)
 
 BASE_K = 6
 K_STEP = 4
-K_MAX = 20
+K_MAX = 20  # 리랭킹을 위해 넉넉하게 가져옴
 
 async def retrieve_node(state: RAGState) -> RAGState:
     rw = state.get("rewrite") or {}
@@ -16,25 +16,15 @@ async def retrieve_node(state: RAGState) -> RAGState:
     # 키워드를 쿼리 뒤에 붙여서 검색 강화
     if keywords:
         q = f"{q} {' '.join(keywords)}"
-    filters = rw.get("filters", {})
 
-    # 시도 횟수에 따라 k 증가
-    k = min(BASE_K + state.get("attempt", 0) * K_STEP, K_MAX)
+    # 1. Vector Search
+    logger.info(f"Retrieving documents: k={K_MAX}, attempt={state.get('attempt', 0)}")
+    docs = await retriever_search(q, k=K_MAX)
 
-    # 필터가 있는지 확인
-    has_filters = any([
-        filters.get("departments"),
-        filters.get("grades"),
-        filters.get("tags")
-    ])
+    # 2. Reranking
+    logger.info("Reranking documents...")
+    reranked_docs = rerank_documents(q, docs, top_n=BASE_K)
 
-    if has_filters:
-        logger.info(f"Retrieving documents with filters: k={k}, attempt={state.get('attempt', 0)}")
-        docs = await retriever_search(q, k=k, filters=filters)
-    else:
-        logger.info(f"Retrieving documents: k={k}, attempt={state.get('attempt', 0)}")
-        docs = await retriever_search(q, k=k)
-
-    logger.info(f"Retrieved {len(docs)} documents")
-    state["docs"] = docs
+    logger.info(f"Retrieved {len(reranked_docs)} documents after reranking")
+    state["docs"] = reranked_docs
     return state

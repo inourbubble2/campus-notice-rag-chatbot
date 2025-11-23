@@ -41,3 +41,5 @@ requests~=2.32.5
 
 # Web
 streamlit~=1.51.0
+sentence-transformers
+huggingface-hub
