@@ -19,8 +19,6 @@ VAL_SYS = """당신은 공지사항 RAG의 품질 검증기입니다.
 
 판단 기준(하나라도 충족 못하면 RETRY 권장):
 - 답변이 질문에 직접적으로 응답하는가?
-- 날짜/기한 등 핵심 정보가 근거 문서에 실제로 존재하는가? (추측/날조 금지)
-- 근거 섹션에 최소 1개 이상의 URL/제목이 있는가?
 - 표현이 모호하면 모호함을 명시했는가?
 """
 
@@ -30,8 +28,7 @@ VAL_USER_TMPL = """원 질문:
 생성된 답변:
 {{ answer }}
 
-문서 개수: {{ doc_count }}
-문서 목록(제목들만):
+문서 목록:
 {% for d in docs %}
 - {{ d }}
 {% endfor %}
@@ -43,12 +40,11 @@ val_prompt = ChatPromptTemplate.from_messages(
 )
 
 def validate_node(state: RAGState) -> RAGState:
-    titles = [ (d.metadata or {}).get("title","(제목없음)") for d in state.get("docs", []) ]
+    page_contents = [ d.page_content for d in state.get("docs", []) ]
     msgs = val_prompt.format_messages(
         question=state["question"],
         answer=state.get("answer", ""),
-        doc_count=len(state.get("docs", [])),
-        docs=titles,
+        docs=page_contents,
     )
     out = get_small_llm().invoke(msgs)
     try:

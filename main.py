@@ -124,8 +124,6 @@ async def chat(request: ChatRequest):
         "metadata": {
             "request_id": request.conversation_id,
             "timestamp": datetime.now().isoformat(),
-            "embedding_model": "text-embedding-3-small",
-            "search_filters": result.get("rewrite", {}).get("filters", {})
         },
         "query": {
             "raw": request.question,
@@ -167,5 +165,6 @@ async def chat(request: ChatRequest):
 
     return {
         "answer": result.get("answer", ""),
-        "contexts": [d.page_content for d in result.get("docs", [])]
+        "contexts": [d.page_content for d in result.get("docs", [])],
+        "urls": [d.metadata.get("url") for d in result.get("docs", [])]
     }
