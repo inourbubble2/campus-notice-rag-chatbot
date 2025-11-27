@@ -1,6 +1,6 @@
 from typing import List
 from langchain_core.documents import Document
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from app.deps import get_chat_llm
 from chat.schema import RAGState
 

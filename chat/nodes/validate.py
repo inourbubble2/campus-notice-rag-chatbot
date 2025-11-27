@@ -1,6 +1,6 @@
 import json
 import logging
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from app.deps import get_small_llm
 from chat.schema import RAGState
 
