@@ -8,6 +8,9 @@ from ingest import ingest_by_ids, ingest_by_date_range
 from parse import process_announcements_by_ids, process_announcements_by_date_range
 from models import IngestByIdsRequest, IngestByDateRangeRequest, ChatRequest
 from chat.chat_graph import app as chat_graph_app
+from fastapi import Depends
+from services.ocr.base import BaseOCRService
+from app.deps import get_ocr_service_provider
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,9 +43,12 @@ async def ingest_announcements_by_date(request: IngestByDateRangeRequest):
 
 
 @app.post("/parse")
-async def parse_announcements(request: IngestByIdsRequest):
+async def parse_announcements(
+    request: IngestByIdsRequest,
+    ocr_service: BaseOCRService = Depends(get_ocr_service_provider)
+):
     try:
-        results = await process_announcements_by_ids(request.ids)
+        results = await process_announcements_by_ids(request.ids, ocr_service)
         return {
             "message": f"Successfully parsed {len(results)} announcements",
             "ids": request.ids,
@@ -69,9 +75,12 @@ async def parse_announcements(request: IngestByIdsRequest):
 
 
 @app.post("/parse/date-range")
-async def parse_announcements_by_date(request: IngestByDateRangeRequest):
+async def parse_announcements_by_date(
+    request: IngestByDateRangeRequest,
+    ocr_service: BaseOCRService = Depends(get_ocr_service_provider)
+):
     try:
-        results = await process_announcements_by_date_range(request.from_date, request.to_date)
+        results = await process_announcements_by_date_range(request.from_date, request.to_date, ocr_service)
         return {
             "message": f"Successfully parsed {len(results)} announcements from {request.from_date} to {request.to_date}",
             "date_range": {"from_date": request.from_date, "to_date": request.to_date},

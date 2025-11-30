@@ -196,3 +196,12 @@ def get_gemini_llm() -> ChatGoogleGenerativeAI:
         google_api_key=cfg.gemini_api_key,
     )
   return _gemini_llm
+
+
+# ---------- OCR Service ----------
+from services.ocr.base import BaseOCRService
+from services.ocr.factory import get_ocr_service as factory_get_ocr_service
+
+@lru_cache()
+def get_ocr_service_provider() -> BaseOCRService:
+    return factory_get_ocr_service()

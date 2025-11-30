@@ -20,7 +20,7 @@ POST http://localhost:8000/parse
 Content-Type: application/json
 
 {
-  "ids": [1069]
+  "ids": [1512]
 }
 
 ### Test parse by date range
