@@ -6,7 +6,6 @@
 import logging
 import asyncio
 from typing import List
-from datetime import datetime
 
 from sqlalchemy import RowMapping
 
@@ -16,7 +15,6 @@ from services.database_service import (
     fetch_rows_by_date_range,
     upsert_processed_record,
 )
-from services.extraction_service import extract_structured_info
 from models.announcement_parsed import AnnouncementParsed
 
 logger = logging.getLogger(__name__)
@@ -24,14 +22,6 @@ logger = logging.getLogger(__name__)
 # 동시 처리 수 제한
 MAX_CONCURRENT_TASKS = 20
 _semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
-
-
-def _parse_datetime(date_str: str) -> datetime | None:
-    """날짜 문자열을 datetime으로 파싱. 실패 시 None 반환."""
-    try:
-        return datetime.fromisoformat(date_str.replace(" ", "T"))
-    except:
-        return None
 
 
 async def _process_single_announcement(row: RowMapping) -> AnnouncementParsed:
@@ -75,22 +65,7 @@ async def _process_single_announcement(row: RowMapping) -> AnnouncementParsed:
                 error_message=ocr_error,  # OCR 실패 시 에러 메시지 기록
             )
 
-            # 6. 구조화된 정보 추가 (추출 성공 시)
-            if structured_info:
-                processed_data.application_period_start = _parse_datetime(structured_info.application_period_start) if structured_info.application_period_start else None
-                processed_data.application_period_end = _parse_datetime(structured_info.application_period_end) if structured_info.application_period_end else None
-                processed_data.target_departments = structured_info.target_departments
-                processed_data.target_grades = structured_info.target_grades
-                processed_data.tags = structured_info.tags
-                if structured_info.additional_info:
-                    processed_data.structured_info = [
-                        i.model_dump() if hasattr(i, "model_dump") else dict(i)
-                        for i in structured_info.additional_info
-                    ]
-                else:
-                    processed_data.structured_info = None
-
-            # 7. 중간 테이블에 UPSERT
+            # 5. 중간 테이블에 UPSERT
             upsert_processed_record(processed_data)
             logger.info(f"✓ Successfully processed announcement {announcement_id}")
             return processed_data
