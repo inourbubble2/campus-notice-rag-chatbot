@@ -157,6 +157,10 @@ cython_debug/
 #  be added to the global gitignore or merged into this project gitignore.  For a PyCharm
 #  project, it is also recommended to ignore all of the following files:
 .idea/
+*.iml
+*.ipr
+*.iws
+.idea_modules/
 
 # VS Code
 .vscode/
