@@ -12,6 +12,7 @@ langchain-openai~=1.1.0
 langchain-postgres==0.0.15
 langchain-text-splitters~=0.3.11
 langchain-google-genai==2.1.0
+langchain-upstage~=0.7.5
 langgraph~=1.0.4
 
 # OpenAI & Embeddings
