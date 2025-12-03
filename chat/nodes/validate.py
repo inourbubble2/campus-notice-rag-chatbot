@@ -1,4 +1,3 @@
-import json
 import logging
 from langchain_core.runnables import RunnableConfig
 from langchain_core.prompts import ChatPromptTemplate
@@ -7,16 +6,16 @@ from chat.schema import RAGState
 
 logger = logging.getLogger(__name__)
 
+from typing import Literal, Optional
+from pydantic import BaseModel, Field
+
+class ValidateResult(BaseModel):
+    """답변 품질 검증 결과"""
+    decision: Literal["PASS", "RETRY"] = Field(description="검증 결과 (PASS 또는 RETRY)")
+    reason: str = Field(description="판정 이유 (간단한 한국어 설명)")
+    critic_query: Optional[str] = Field(None, description="재시도 시 개선된 검색 질의 제안 (없으면 None)")
+
 VAL_SYS = """당신은 공지사항 RAG의 품질 검증기입니다.
-반드시 아래 JSON 하나만 반환하세요.
-스키마:
-{% raw %}
-{
-  "decision": "PASS" | "RETRY",
-  "reason": "간단한 한국어 설명",
-  "critic_query": "재시도 시 개선된 검색 질의 제안(없으면 빈 문자열)"
-}
-{% endraw %}
 
 판단 기준(하나라도 충족 못하면 RETRY 권장):
 - 답변이 질문에 직접적으로 응답하는가?
@@ -30,9 +29,7 @@ VAL_USER_TMPL = """원 질문:
 {{ answer }}
 
 문서 목록:
-{% for d in docs %}
-- {{ d }}
-{% endfor %}
+{{ docs }}
 """
 
 val_prompt = ChatPromptTemplate.from_messages(
@@ -42,21 +39,25 @@ val_prompt = ChatPromptTemplate.from_messages(
 
 def validate_node(state: RAGState, config: RunnableConfig) -> RAGState:
     page_contents = [ d.page_content for d in state.get("docs", []) ]
+    docs_str = "\n".join([f"- {content}" for content in page_contents])
+    
     msgs = val_prompt.format_messages(
         question=state["question"],
         answer=state.get("answer", ""),
-        docs=page_contents,
+        docs=docs_str,
     )
-    out = get_small_llm().invoke(msgs, config=config)
+
+    structured_llm = get_small_llm().with_structured_output(ValidateResult)
+
     try:
-        data = json.loads(out.content)
-        decision = data.get("decision","PASS")
-        if decision not in ("PASS","RETRY"):
-            decision = "PASS"
-        critic = data.get("critic_query") or ""
-        state["validate"] = {"decision": decision, "reason": data.get("reason",""), "critic_query": critic}
+        result: ValidateResult = structured_llm.invoke(msgs, config=config)
+        state["validate"] = {
+            "decision": result.decision,
+            "reason": result.reason,
+            "critic_query": result.critic_query or ""
+        }
     except Exception as e:
-        logger.warning(f"Validate JSON parse failed: {e}. LLM output: {out.content[:200]}")
+        logger.warning(f"Validate failed: {e}")
         state["validate"] = {"decision": "PASS", "reason": "", "critic_query": ""}
 
     # 만약 RETRY라면, critic_query로 rewrite를 살짝 보강
