@@ -26,7 +26,6 @@ async def _ingest_parsed_rows(rows: List[RowMapping]) -> dict:
 
     await embed_and_store_documents(
         docs=docs,
-        announcement_count=len(rows)
     )
 
     logger.info(f"✓ Successfully embedded and stored {len(docs)} chunks")
