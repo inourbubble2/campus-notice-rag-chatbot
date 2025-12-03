@@ -1,4 +1,3 @@
-import time
 import base64
 import asyncio
 import logging
@@ -12,6 +11,7 @@ from tenacity import (
 )
 from app.deps import get_gemini_llm
 from services.ocr.base import BaseOCRService
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 
 logger = logging.getLogger(__name__)
 
@@ -58,22 +58,18 @@ class GeminiOCRService(BaseOCRService):
 
         logger.info(f"Gemini OCR 요청 시작 - 이미지 크기: {image_size_kb:.2f}KB")
 
-        start_time = time.time()
+        usage_callback = UsageMetadataCallbackHandler()
+
         try:
-            response = await model.ainvoke([system_message, human_message])
+            response = await model.ainvoke(
+                [system_message, human_message],
+                config={"callbacks": [usage_callback]}
+            )
         except Exception as e:
             logger.error(f"OCR 요청 실패 - 이미지 크기: {image_size_kb:.2f}KB, 에러: {type(e).__name__}: {str(e)}")
             raise
 
-        end_time = time.time()
-        duration_ms = (end_time - start_time) * 1000
+        token_usage = usage_callback.usage_metadata
+        logger.info(f"OCR 성공 - 이미지 크기: {image_size_kb:.2f}KB. Token Usage: {token_usage}")
 
-        # 응답 메타데이터에서 토큰 사용량 추출
-        input_tokens = getattr(response, 'usage_metadata', {}).get('input_tokens', 0) if hasattr(response, 'usage_metadata') else 0
-        output_tokens = getattr(response, 'usage_metadata', {}).get('output_tokens', 0) if hasattr(response, 'usage_metadata') else 0
-        total_tokens = input_tokens + output_tokens
-
-        result_text = response.content if response.content else ""
-
-        logger.info(f"OCR 성공 - 이미지 크기: {image_size_kb:.2f}KB, 소요 시간: {duration_ms:.2f}ms")
-        return result_text
+        return response.content

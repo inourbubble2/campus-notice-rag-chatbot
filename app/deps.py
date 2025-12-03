@@ -13,7 +13,6 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
-from pydantic_settings import BaseSettings
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -158,6 +157,7 @@ def get_gemini_llm() -> ChatGoogleGenerativeAI:
         temperature=0,
         timeout=cfg.ocr_timeout,
         google_api_key=cfg.gemini_api_key,
+        include_thoughts=True,  # 토큰 사용량 추적을 위한 workaround
     )
   return _gemini_llm
 
