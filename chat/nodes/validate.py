@@ -1,5 +1,6 @@
 import json
 import logging
+from langchain_core.runnables import RunnableConfig
 from langchain_core.prompts import ChatPromptTemplate
 from app.deps import get_small_llm
 from chat.schema import RAGState
@@ -39,14 +40,14 @@ val_prompt = ChatPromptTemplate.from_messages(
     template_format="jinja2",
 )
 
-def validate_node(state: RAGState) -> RAGState:
+def validate_node(state: RAGState, config: RunnableConfig) -> RAGState:
     page_contents = [ d.page_content for d in state.get("docs", []) ]
     msgs = val_prompt.format_messages(
         question=state["question"],
         answer=state.get("answer", ""),
         docs=page_contents,
     )
-    out = get_small_llm().invoke(msgs)
+    out = get_small_llm().invoke(msgs, config=config)
     try:
         data = json.loads(out.content)
         decision = data.get("decision","PASS")

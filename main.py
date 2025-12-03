@@ -11,6 +11,7 @@ from chat.chat_graph import app as chat_graph_app
 from fastapi import Depends
 from services.ocr.base import BaseOCRService
 from app.deps import get_ocr_service_provider
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -111,6 +112,8 @@ async def chat(request: ChatRequest):
     """RAG 기반 캠퍼스 공지사항 챗봇 API"""
     start_time = time.time()
 
+    usage_callback = UsageMetadataCallbackHandler()
+
     result = await chat_graph_app.ainvoke(
         {
             "question": request.question,
@@ -121,13 +124,17 @@ async def chat(request: ChatRequest):
             "validate": None,
             "guardrail": None,
         },
-        config={"configurable": {"thread_id": request.conversation_id}},
+        config={
+            "configurable": {"thread_id": request.conversation_id},
+            "callbacks": [usage_callback]
+        },
     )
 
     end_time = time.time()
     total_latency_ms = (end_time - start_time) * 1000
 
-    logger.info(f"Request {request.conversation_id} processed. Latency: {total_latency_ms:.2f}ms")
+    token_usage = usage_callback.usage_metadata
+    logger.info(f"Request {request.conversation_id} processed. Latency: {total_latency_ms:.2f}ms. Token Usage: {token_usage}")
 
     log_data = {
         "metadata": {
@@ -158,7 +165,8 @@ async def chat(request: ChatRequest):
             "model": "gpt-4o-mini",
             "first_token_latency_ms": None,
             "total_latency_ms": round(total_latency_ms, 2),
-            "final_answer": result.get("answer")
+            "final_answer": result.get("answer"),
+            "token_usage": token_usage
         }
     }
 

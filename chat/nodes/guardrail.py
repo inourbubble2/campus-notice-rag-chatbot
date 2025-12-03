@@ -1,5 +1,6 @@
 import json
 import logging
+from langchain_core.runnables import RunnableConfig
 from langchain_core.prompts import ChatPromptTemplate
 from app.deps import get_small_llm
 from chat.schema import RAGState
@@ -33,12 +34,12 @@ guard_prompt = ChatPromptTemplate.from_messages(
     template_format="jinja2",
 )
 
-def guardrail_node(state: RAGState) -> RAGState:
+def guardrail_node(state: RAGState, config: RunnableConfig) -> RAGState:
     msgs = guard_prompt.format_messages(
         question=state["question"],
         chat_history=state.get("chat_history", [])
     )
-    out = get_small_llm().invoke(msgs)
+    out = get_small_llm().invoke(msgs, config=config)
     try:
         data = json.loads(out.content)
         pol = data.get("policy", "PASS")

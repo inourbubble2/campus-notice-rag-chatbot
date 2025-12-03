@@ -1,5 +1,6 @@
 from typing import List
 from langchain_core.documents import Document
+from langchain_core.runnables import RunnableConfig
 from langchain_core.prompts import ChatPromptTemplate
 from app.deps import get_chat_llm
 from chat.schema import RAGState
@@ -39,7 +40,7 @@ def format_context(docs: List[Document]) -> str:
         )
     return "\n".join(lines)
 
-async def generate_node(state: RAGState) -> RAGState:
+async def generate_node(state: RAGState, config: RunnableConfig) -> RAGState:
     rw = state.get("rewrite") or {}
     ctx = format_context(state["docs"])
 
@@ -56,7 +57,7 @@ async def generate_node(state: RAGState) -> RAGState:
     )
 
     # Generate answer
-    out = get_chat_llm().invoke(msgs)
+    out = await get_chat_llm().ainvoke(msgs, config=config)
 
     # 출처 정리
     sources = []
