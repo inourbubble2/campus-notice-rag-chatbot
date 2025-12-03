@@ -19,8 +19,13 @@ class Settings(BaseSettings):
   use_jsonb: bool = True
 
   # LLM
-  chat_model: str = "gpt-4o-mini"        # 최종 응답 생성용
-  small_model: str = "gpt-4o-mini"       # 가벼운 재작성/가드/검증용
+  # LLM
+  chat_model: str = "gpt-4o-mini"
+  chat_model_provider: str = "openai"
+  small_model: str = "gpt-4o-mini"
+  small_model_provider: str = "openai"
+  vision_model: str = "gemini-2.5-flash"
+  vision_model_provider: str = "google_genai"
   temperature: float = 0.0
   llm_timeout: int = 60              # seconds
   small_llm_timeout: int = 5

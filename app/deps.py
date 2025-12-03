@@ -18,8 +18,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import OpenAIEmbeddings
 from langchain_postgres.vectorstores import PGVector
 from langchain_core.vectorstores import VectorStore
 from langchain_core.retrievers import BaseRetriever
@@ -116,30 +115,35 @@ def get_openai_client() -> AsyncOpenAI:
   return _openai_client
 
 
-# ---------- LLMs ----------
-_chat_llm: Optional[ChatOpenAI] = None
-_small_llm: Optional[ChatOpenAI] = None
-_gemini_llm: Optional[ChatGoogleGenerativeAI] = None
+from langchain.chat_models import init_chat_model
+from langchain_core.language_models import BaseChatModel
 
-def get_chat_llm() -> ChatOpenAI:
+# ---------- LLMs ----------
+_chat_llm: Optional[BaseChatModel] = None
+_small_llm: Optional[BaseChatModel] = None
+_gemini_llm: Optional[BaseChatModel] = None
+
+def get_chat_llm() -> BaseChatModel:
   """최종 답변 생성용 LLM."""
   global _chat_llm
   if _chat_llm is None:
     cfg = get_settings()
-    _chat_llm = ChatOpenAI(
+    _chat_llm = init_chat_model(
         model=cfg.chat_model,
+        model_provider=cfg.chat_model_provider,
         temperature=cfg.temperature,
         timeout=cfg.llm_timeout,
-        api_key=cfg.openai_api_key,
+        api_key=cfg.openai_api_key,  # Provider가 다르면 무시되거나 에러날 수 있음. 분기 필요할 수도.
     )
   return _chat_llm
 
-def get_small_llm() -> ChatOpenAI:
+def get_small_llm() -> BaseChatModel:
   global _small_llm
   if _small_llm is None:
     cfg = get_settings()
-    _small_llm = ChatOpenAI(
+    _small_llm = init_chat_model(
         model=cfg.small_model,
+        model_provider=cfg.small_model_provider,
         temperature=cfg.temperature,
         timeout=cfg.small_llm_timeout,
         api_key=cfg.openai_api_key,
@@ -147,17 +151,17 @@ def get_small_llm() -> ChatOpenAI:
   return _small_llm
 
 
-def get_gemini_llm() -> ChatGoogleGenerativeAI:
+def get_gemini_llm() -> BaseChatModel:
   """OCR 등 Vision 작업용 Gemini LLM."""
   global _gemini_llm
   if _gemini_llm is None:
     cfg = get_settings()
-    _gemini_llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+
+    _gemini_llm = init_chat_model(
+        model=cfg.vision_model,
+        model_provider=cfg.vision_model_provider,
         temperature=0,
         timeout=cfg.ocr_timeout,
-        google_api_key=cfg.gemini_api_key,
-        include_thoughts=True,  # 토큰 사용량 추적을 위한 workaround
     )
   return _gemini_llm
 
