@@ -3,7 +3,7 @@ POST http://localhost:8000/ingest
 Content-Type: application/json
 
 {
-  "ids": [632]
+  "ids": [1512]
 }
 
 ### Test ingest by date range

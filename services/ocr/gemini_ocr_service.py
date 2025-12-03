@@ -11,7 +11,6 @@ from tenacity import (
   before_sleep_log
 )
 from app.deps import get_gemini_llm
-from models.metrics import OCRMetrics, get_ocr_metrics_aggregator
 from services.ocr.base import BaseOCRService
 
 logger = logging.getLogger(__name__)
@@ -28,8 +27,6 @@ class GeminiOCRService(BaseOCRService):
             - 최대 1500자 이내
             - 불필요한 수식어/중복 제거
             - 표/레이아웃/좌표/메타데이터 금지
-            - 중요도 순 5~10개 불릿
-            - 너무 길어질 경우 상위 중요 정보만
         """
 
     @retry(
@@ -77,21 +74,6 @@ class GeminiOCRService(BaseOCRService):
         total_tokens = input_tokens + output_tokens
 
         result_text = response.content if response.content else ""
-
-        # 메트릭 생성
-        metrics = OCRMetrics(
-            duration_ms=duration_ms,
-            image_size_kb=image_size_kb,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            total_tokens=total_tokens,
-            result_length=len(result_text),
-            success=True
-        )
-
-        # 전역 집계기에 메트릭 추가
-        aggregator = get_ocr_metrics_aggregator()
-        aggregator.add_metrics(metrics)
 
         logger.info(f"OCR 성공 - 이미지 크기: {image_size_kb:.2f}KB, 소요 시간: {duration_ms:.2f}ms")
         return result_text

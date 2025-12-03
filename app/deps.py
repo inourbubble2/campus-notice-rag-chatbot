@@ -154,7 +154,7 @@ def get_gemini_llm() -> ChatGoogleGenerativeAI:
   if _gemini_llm is None:
     cfg = get_settings()
     _gemini_llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-lite",
+        model="gemini-2.5-flash",
         temperature=0,
         timeout=cfg.ocr_timeout,
         google_api_key=cfg.gemini_api_key,
