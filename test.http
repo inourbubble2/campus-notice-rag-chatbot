@@ -11,8 +11,8 @@ POST http://localhost:8000/ingest/date-range
 Content-Type: application/json
 
 {
-  "from_date": "2025-03-01",
-  "to_date": "2025-03-07"
+  "from_date": "2025-01-01",
+  "to_date": "2025-09-17"
 }
 
 ### Test parse by IDs
@@ -37,6 +37,6 @@ POST http://localhost:8000/chat
 Content-Type: application/json
 
 {
-  "question": "2026학년도 1학기 교환학생 신청 기간이 언제야??",
+  "question": "올해 취업 박람회에 참여해 마케팅 관련 직무 멘토링을 듣고 싶은데 일시와 참여 기업 알려줘.",
   "conversation_id": "aaaa"
 }

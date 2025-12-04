@@ -40,7 +40,7 @@ val_prompt = ChatPromptTemplate.from_messages(
 def validate_node(state: RAGState, config: RunnableConfig) -> RAGState:
     page_contents = [ d.page_content for d in state.get("docs", []) ]
     docs_str = "\n".join([f"- {content}" for content in page_contents])
-    
+
     msgs = val_prompt.format_messages(
         question=state["question"],
         answer=state.get("answer", ""),
@@ -66,7 +66,7 @@ def validate_node(state: RAGState, config: RunnableConfig) -> RAGState:
         critic_q = state["validate"].get("critic_query") or ""
         if critic_q:
             # 기존 재작성 질의에 critic 힌트를 덧붙임
-            rw = state.get("rewrite") or {"query": state["question"], "keywords": []}
+            rw = state.get("rewrite") or {"query": state["question"]}
             rw["query"] = f"{rw.get('query','')} | {critic_q}"
             state["rewrite"] = rw
             logger.info(f"Critic query added: {critic_q}")

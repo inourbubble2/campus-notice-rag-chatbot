@@ -1,4 +1,3 @@
-
 import logging
 from langchain_core.runnables import RunnableConfig
 from langchain_core.prompts import ChatPromptTemplate
@@ -7,16 +6,27 @@ from chat.schema import RAGState
 
 logger = logging.getLogger(__name__)
 
-from typing import List
 from pydantic import BaseModel, Field
 
 class RewriteResult(BaseModel):
     """질의 재작성 결과"""
     query: str = Field(description="벡터 검색에 적합한 1~2문장 한국어 질의(핵심 키워드/동의어 포함)")
-    keywords: List[str] = Field(description="핵심 키워드 리스트 (너무 일반적인 단어 제외, 고유명사 위주 추출)")
 
-REWRITE_SYS = """당신은 대학 공지사항 RAG를 위한 질의 재작성기입니다.
-이전 대화와 원 질문을 참고하여 적절한 질의를 재작성하세요.
+REWRITE_SYS = """당신은 '대학 공지사항 RAG 시스템'을 위한 질의 재작성기(쿼리 리라이터)입니다.
+
+역할:
+- 사용자의 자연어 질문과 이전 대화를 기반으로,
+  벡터 검색 및 키워드 검색에 모두 잘 걸리는 형태로 질의를 재작성합니다.
+- 답변을 생성하는 것이 아니라, 검색용 쿼리(query)를 만드는 것이 목적입니다.
+
+도메인:
+- 대학(특히 서울시립대학교)의 공지사항, 학사 안내, 장학/프로그램, 행사, 튜터링, 학점교류, 휴학/복학 등과 관련된 정보를 다룹니다.
+
+원칙:
+1. 의미는 보존하되, 공지 제목처럼 간결하고 정보 밀도가 높은 표현으로 바꿉니다.
+2. 대학/학사 맥락(학교명, 학년도, 학기, 전공/학부, 프로그램명 등)이 드러나면 검색 품질이 높아지므로, 질문에 언급된 정보는 가능한 한 유지·명시합니다.
+3. 모호한 대명사(이것, 저것, 거기, 그때 등)는 chat_history를 참고해 가능한 한 구체적인 명사(과목명, 프로그램명, 행사명 등)로 치환합니다.
+4. 새로운 사실을 지어내거나, 질문에 없는 구체적인 날짜·조건을 임의로 추가하지 않습니다.
 """
 
 REWRITE_USER_TMPL = """대화 기록:
@@ -26,8 +36,13 @@ REWRITE_USER_TMPL = """대화 기록:
 {{ question }}
 
 지침:
-1. **query**: 의미 보존하면서 불용어 제거, 동의어/변형어를 괄호로 보강 (예: 휴학(휴학신청,휴학기간))
-2. **keywords**: 핵심 키워드 추출 (너무 일반적인 단어 제외, 고유명사가 있다면 추출)
+- 사용자의 질문과 이전 대화 맥락의 의미를 보존하면서, 공지 제목/검색어처럼 간결하게 재작성합니다.
+- 불필요한 구어체(나, 좀, 언제야, 알려줘 등)와 의미 없는 불용어는 제거합니다.
+- 대학/학사 도메인 맥락이 드러나도록, 학교명·학년도·학기·전공/학부·프로그램명·행사명을 가능한 한 명시합니다.
+- 유사 표현·동의어·변형어는 괄호를 사용해 보강합니다.
+ 예: 휴학(휴학신청, 휴학기간), 복수전공(이중전공), 기숙사(국제학사, 하계 기숙사)
+- 최종 형태는 공지 제목 같은 한 문장으로 작성합니다.
+ 예: "2025학년도 2학기 시대튜터링 학습도우미 지원 자격 및 평점 기준 안내"
 """
 
 rewrite_prompt = ChatPromptTemplate.from_messages(
@@ -53,19 +68,16 @@ def rewrite_node(state: RAGState, config: RunnableConfig) -> RAGState:
         result: RewriteResult = structured_llm.invoke(msgs, config=config)
         data = {
             "query": result.query,
-            "keywords": result.keywords
         }
     except Exception as e:
         logger.warning(f"Rewrite failed: {e}")
         data = {
             "query": state["question"],
-            "keywords": [],
         }
 
     state["rewrite"] = data
     state["attempt"] = state.get("attempt", 0) or 0
 
     logger.info(f"Query rewritten: '{state['question']}' -> '{data.get('query')}'")
-    logger.info(f"Keywords: {data.get('keywords')}")
 
     return state

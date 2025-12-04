@@ -20,7 +20,6 @@ GEN_USER_TMPL = """이전 대화:
 질문: {question}
 
 검색 질의(재작성): {rewritten_query}
-핵심 키워드: {keywords}
 
 참고할 공지:
 {context}
@@ -52,7 +51,6 @@ async def generate_node(state: RAGState, config: RunnableConfig) -> RAGState:
         question=state["question"],
         chat_history=history_str,
         rewritten_query=rw.get("query") or state["question"],
-        keywords=", ".join(rw.get("keywords", [])),
         context=ctx,
     )
 
