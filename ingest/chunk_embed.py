@@ -1,12 +1,14 @@
 import logging
 from typing import List, Dict
+from app.settings import get_settings
 
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+cfg = get_settings()
 splitter = RecursiveCharacterTextSplitter(
-    chunk_size=800,
-    chunk_overlap=120,
+    chunk_size=cfg.chunk_size,
+    chunk_overlap=cfg.chunk_overlap,
     separators=["\n\n", "\n", ".", "!", "?", " ", ""],
 )
 

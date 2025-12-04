@@ -16,6 +16,8 @@ class Settings(BaseSettings):
   collection_name: str = "uos_announcement"
   embed_model: str = "text-embedding-3-small"
   embed_dim: int = 1536
+  chunk_size: int = 512
+  chunk_overlap: int = 50
   use_jsonb: bool = True
 
   # LLM
