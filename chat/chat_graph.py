@@ -12,7 +12,7 @@ from chat.nodes.validate import validate_node
 # =========================
 # Graph Wiring (with loop)
 # =========================
-MAX_ATTEMPTS = 2  # 총 1차 시도 + 2번 재시도 = 최대 3회
+MAX_RETRY_ATTEMPTS = 3
 
 graph = StateGraph(RAGState)
 
@@ -37,7 +37,7 @@ graph.add_edge("generate", "validate")
 
 # validate 결과에 따라 PASS면 종료, RETRY면 루프(재검색→재생성)
 def validate_router(state: RAGState):
-    if (state.get("validate") or {}).get("decision") == "RETRY" and state.get("attempt", 0) < MAX_ATTEMPTS:
+    if (state.get("validate") or {}).get("decision") == "RETRY" and state.get("attempt", 0) < MAX_RETRY_ATTEMPTS:
         return "retrieve"
     return END
 
