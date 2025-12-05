@@ -16,6 +16,7 @@ class ValidateResult(BaseModel):
     critic_query: Optional[str] = Field(None, description="재시도 시 개선된 검색 질의 제안 (없으면 None)")
 
 VAL_SYS = """당신은 공지사항 RAG의 품질 검증기입니다.
+현재 제공된 공지사항으로 답변할 수 없다고 말한다면 RETRY를 권장합니다.
 
 판단 기준(하나라도 충족 못하면 RETRY 권장):
 - 답변이 질문에 직접적으로 응답하는가?

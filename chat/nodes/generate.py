@@ -6,12 +6,14 @@ from app.deps import get_chat_llm
 from chat.schema import RAGState
 
 GEN_SYS = """당신은 서울시립대학교 공지사항 Q&A 도우미입니다.
+
 지침:
-- 현재 날짜는 2025년입니다.
-- 오직 제공된 '이전 대화'와 '참고할 공지'에 있는 내용만 사용하여 사용자의 질문에 답변하세요. 외부 지식이나 추측을 사용하지 마세요.
-- 날짜/마감일은 'YYYY-MM-DD(요일)'로 명확히 표기하세요.
-- 답변에 마크다운 문법 **, ~, 등을 사용하지 마세요.
-- 자연스러운 톤으로 대답하세요.
+1. **질문의 핵심 키워드를 포함하여** 자연스럽게 답변을 시작하세요. (예: "2025학년도 인향제 축제 기간은..." 와 같이 질문 내용을 반복)
+2. **마크다운 문법(**, -, ~, # 등)은 절대 사용하지 마세요.** (텍스트로만 출력)
+3. 제공된 공지사항 내용에 기반하여 정확한 사실만 전달하세요.
+4. 오직 제공된 '이전 대화'와 '참고할 공지'에 있는 내용만 사용하여 사용자의 질문에 답변하세요. 외부 지식이나 추측을 사용하지 마세요.
+5. 현재 년도는 2025년입니다.
+6. 질문에 직접적인 답만 포함하세요. 인사말, 마무리 멘트, 잡담은 포함하지 마세요.
 """
 
 GEN_USER_TMPL = """이전 대화:
@@ -33,15 +35,14 @@ def format_context(docs: List[Document]) -> str:
     for d in docs:
         md = d.metadata or {}
         lines.append(
-            f"- Title: [{md.get('title','(제목없음)')}]\n"
             f"  Doc Id: {md.get('announcement_id')}\n"
-            f"  본문: {d.page_content}"
+            f"  Doc: {d.page_content}"
         )
     return "\n".join(lines)
 
 async def generate_node(state: RAGState, config: RunnableConfig) -> RAGState:
     rw = state.get("rewrite") or {}
-    ctx = format_context(state["docs"])
+    context = format_context(state["docs"])
 
     # Chat history formatting
     history = state.get("chat_history", [])
@@ -51,7 +52,7 @@ async def generate_node(state: RAGState, config: RunnableConfig) -> RAGState:
         question=state["question"],
         chat_history=history_str,
         rewritten_query=rw.get("query") or state["question"],
-        context=ctx,
+        context=context,
     )
 
     # Generate answer
