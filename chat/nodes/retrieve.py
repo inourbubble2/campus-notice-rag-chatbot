@@ -17,7 +17,7 @@ async def retrieve_node(state: RAGState) -> RAGState:
 
     docs = await retriever_search(q, k)
 
-    for i, doc in enumerate(docs, 1):
+    for doc in docs:
         print(f"id: {doc.metadata.get('announcement_id')}, score:{doc.metadata.get('score')} - {doc.page_content[:150].replace(chr(10), ' ')}...")
 
     logger.info(f"Retrieved {len(docs)} documents")

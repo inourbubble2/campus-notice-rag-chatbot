@@ -7,42 +7,56 @@ from typing import List
 from langchain_core.documents import Document
 
 from app.deps import get_vectorstore
+from services.database_service import fetch_parsed_records_by_ids
 
 logger = logging.getLogger(__name__)
-
-
-async def retriever_search(
-    query: str,
-    k: int,
-) -> List[Document]:
+async def retriever_search(query: str, k: int) -> List[Document]:
     vectorstore = get_vectorstore()
 
-    docs_with_score = await vectorstore.asimilarity_search_with_score(query, k)
-    docs = []
-    for doc, score in docs_with_score:
-        if doc.metadata is None:
-            doc.metadata = {}
-        doc.metadata["score"] = score
-        docs.append(doc)
+    child_docs = await vectorstore.asimilarity_search_with_score(query, k=k)
 
-    return docs
+    parent_ids = []
+    id_to_score = {}
 
+    for doc, score in child_docs:
+        pid = doc.metadata.get("announcement_id")
+        if pid and pid not in id_to_score:
+            id_to_score[pid] = score
+            parent_ids.append(pid)
 
-if __name__ == "__main__":
-    import asyncio
+        if len(parent_ids) >= k:
+            break
 
-    async def main():
-        # test
-        test_query = "미래디자인"
-        print(f"Query: {test_query}\n")
+    if not parent_ids:
+        return []
 
-        results = await retriever_search(query=test_query, k=5)
+    rows = fetch_parsed_records_by_ids(parent_ids)
+    row_map = {row['announcement_id']: row for row in rows}
 
-        print(f"Found {len(results)} documents:\n")
-        for i, doc in enumerate(results, 1):
-            print(f"=== Document {i} ===")
-            print(f"Content: {doc.page_content}...")
-            print(f"Metadata: {doc.metadata}")
-            print()
+    final_docs = []
+    for pid in parent_ids:
+        row = row_map.get(pid)
 
-    asyncio.run(main())
+        parts = [f"제목: {row['title']}"]
+        if row.get('cleaned_text'):
+            parts.append(row['cleaned_text'])
+        if row.get('ocr_text'):
+            parts.append(f"\n[이미지/첨부파일 내용]\n{row['ocr_text']}")
+
+        full_text = "\n\n".join(parts)
+
+        # 메타데이터
+        metadata = {
+            "announcement_id": row['announcement_id'],
+            "title": row['title'],
+            "board": row.get('board'),
+            "author": row.get('author'),
+            "major": row.get('major'),
+            "url": row.get('url'),
+            "written_at": row['written_at'].isoformat() if row.get('written_at') else None,
+            "score": id_to_score[pid]
+        }
+
+        final_docs.append(Document(page_content=full_text, metadata=metadata))
+
+    return final_docs
