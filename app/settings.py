@@ -30,7 +30,7 @@ class Settings(BaseSettings):
   vision_model_provider: str = "google_genai"
   temperature: float = 0.0
   llm_timeout: int = 60              # seconds
-  small_llm_timeout: int = 5
+  small_llm_timeout: int = 60
 
   # OCR
   ocr_provider: str = "gemini"

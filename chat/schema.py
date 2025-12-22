@@ -4,9 +4,6 @@ from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
 from langchain_core.documents import Document
 
-class RewriteResult(BaseModel):
-    """질의 재작성 결과"""
-    query: str = Field(description="벡터 검색에 적합한 1~2문장 한국어 질의(핵심 키워드/동의어 포함)")
 
 class ValidateResult(BaseModel):
     """답변 품질 검증 결과"""
@@ -26,8 +23,6 @@ class RAGState(BaseModel):
     docs: List[Document] = Field(default_factory=list)
     answer: Optional[str] = None
     
-    # Nested Pydantic Models
-    rewrite: Optional[RewriteResult] = None
     validation: Optional[ValidateResult] = None
     guardrail: Optional[GuardrailResult] = None
     
