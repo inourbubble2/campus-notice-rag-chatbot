@@ -1,5 +1,5 @@
 # models package
-from .requests import IngestByIdsRequest, IngestByDateRangeRequest, ChatRequest
+from .requests import IngestByIdsRequest, IngestByDateRangeRequest, ChatRequest, ChatResponse
 
 from .announcement_parsed import (
   AnnouncementParsed, AnnouncementParsedInfo
@@ -10,6 +10,7 @@ __all__ = [
     "IngestByDateRangeRequest",
 
     "ChatRequest",
+    "ChatResponse",
     "AnnouncementParsed",
     "AnnouncementParsedInfo",
 ]

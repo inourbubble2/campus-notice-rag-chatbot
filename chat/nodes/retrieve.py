@@ -8,18 +8,13 @@ BASE_K = 6
 K_STEP = 4
 K_MAX = 20
 
-async def retrieve_node(state: RAGState) -> RAGState:
-    rw = state.get("rewrite") or {}
-    q = rw.get("query") or state["question"]
+async def retrieve_node(state: RAGState) -> dict:
+    query = state.question
+    if state.rewrite and state.rewrite.query:
+        query = state.rewrite.query
 
-    # 시도 횟수에 따라 k 증가
-    k = min(BASE_K + state.get("attempt", 0) * K_STEP, K_MAX)
+    k = min(BASE_K + state.attempt * K_STEP, K_MAX)
 
-    docs = await retriever_search(q, k)
+    docs = await retriever_search(query, k)
 
-    for i, doc in enumerate(docs, 1):
-        print(f"id: {doc.metadata.get('announcement_id')}, score:{doc.metadata.get('score')} - {doc.page_content[:150].replace(chr(10), ' ')}...")
-
-    logger.info(f"Retrieved {len(docs)} documents")
-    state["docs"] = docs
-    return state
+    return {"docs": docs}

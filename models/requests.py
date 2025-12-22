@@ -15,3 +15,8 @@ class IngestByDateRangeRequest(BaseModel):
 class ChatRequest(BaseModel):
     question: str
     conversation_id: str
+
+class ChatResponse(BaseModel):
+    answer: str
+    contexts: List[str]
+    urls: List[str]

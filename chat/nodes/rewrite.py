@@ -2,15 +2,9 @@ import logging
 from langchain_core.runnables import RunnableConfig
 from langchain_core.prompts import ChatPromptTemplate
 from app.deps import get_small_llm
-from chat.schema import RAGState
+from chat.schema import RAGState, RewriteResult
 
 logger = logging.getLogger(__name__)
-
-from pydantic import BaseModel, Field
-
-class RewriteResult(BaseModel):
-    """질의 재작성 결과"""
-    query: str = Field(description="벡터 검색에 적합한 1~2문장 한국어 질의(핵심 키워드/동의어 포함)")
 
 REWRITE_SYS = """당신은 '대학 공지사항 RAG 시스템'을 위한 질의 재작성기(쿼리 리라이터)입니다.
 
@@ -51,33 +45,20 @@ rewrite_prompt = ChatPromptTemplate.from_messages(
 )
 
 
-def rewrite_node(state: RAGState, config: RunnableConfig) -> RAGState:
-    # Chat history formatting
-    history = state.get("chat_history", [])
-    history_str = "\n".join([f"- {m['role']}: {m['content']}" for m in history[-6:]])
+def rewrite_node(state: RAGState, config: RunnableConfig) -> dict:
+    question = state.question
+
+    messages = state.messages
+    history_msgs = messages[:-1]
+    history_str = "\n".join([f"- {m.type}: {m.content}" for m in history_msgs[-6:]])
 
     msgs = rewrite_prompt.format_messages(
-        question=state["question"],
+        question=question,
         chat_history=history_str
     )
 
-    # Structured Output 사용
     structured_llm = get_small_llm().with_structured_output(RewriteResult)
 
-    try:
-        result: RewriteResult = structured_llm.invoke(msgs, config=config)
-        data = {
-            "query": result.query,
-        }
-    except Exception as e:
-        logger.warning(f"Rewrite failed: {e}")
-        data = {
-            "query": state["question"],
-        }
+    result: RewriteResult = structured_llm.invoke(msgs, config=config)
 
-    state["rewrite"] = data
-    state["attempt"] = state.get("attempt", 0) or 0
-
-    logger.info(f"Query rewritten: '{state['question']}' -> '{data.get('query')}'")
-
-    return state
+    return {"rewrite": result, "attempt": state.attempt}

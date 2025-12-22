@@ -21,7 +21,7 @@ GEN_USER_TMPL = """이전 대화:
 
 질문: {question}
 
-검색 질의(재작성): {rewritten_query}
+재작성된 질의: {rewrite_result}
 
 참고할 공지:
 {context}
@@ -40,42 +40,22 @@ def format_context(docs: List[Document]) -> str:
         )
     return "\n".join(lines)
 
-async def generate_node(state: RAGState, config: RunnableConfig) -> RAGState:
-    rw = state.get("rewrite") or {}
-    context = format_context(state["docs"])
+async def generate_node(state: RAGState, config: RunnableConfig) -> dict:
+    context = format_context(state.docs)
 
-    # Chat history formatting
-    history = state.get("chat_history", [])
-    history_str = "\n".join([f"- {m['role']}: {m['content']}" for m in history[-6:]])
+    question = state.question
+
+    messages = state.messages
+    history_msgs = messages[:-1]
+    history_str = "\n".join([f"- {m.type}: {m.content}" for m in history_msgs[-6:]])
 
     msgs = gen_prompt.format_messages(
-        question=state["question"],
+        question=question,
         chat_history=history_str,
-        rewritten_query=rw.get("query") or state["question"],
+        rewrite_result=state.rewrite or {},
         context=context,
     )
 
-    # Generate answer
     out = await get_chat_llm().ainvoke(msgs, config=config)
 
-    # 출처 정리
-    sources = []
-    used = set()
-    for d in state["docs"]:
-        m = d.metadata or {}
-        key = (m.get("url"), m.get("title"))
-        if key in used:
-            continue
-        used.add(key)
-        sources.append(f"- {m.get('announcement_id')} | {m.get('title')} | {m.get('board')} | {m.get('major')} | {m.get('author')} | {m.get('written_at')} | {m.get('url')}")
-
-    state["answer"] = out.content
-
-    # Update chat history
-    new_history = state.get("chat_history", []) + [
-        {"role": "user", "content": state["question"]},
-        {"role": "assistant", "content": out.content}
-    ]
-    state["chat_history"] = new_history
-
-    return state
+    return {"messages": [out], "answer": out.content}
